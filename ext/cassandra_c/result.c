@@ -1,6 +1,6 @@
 #include "cassandra_c.h"
 
-VALUE rb_cResult;
+VALUE cCassResult;
 
 // Memory management for Result
 static void result_free(void* ptr) {
@@ -45,7 +45,7 @@ static VALUE result_initialize(VALUE self, VALUE wrapped_result) {
 
 // Create a new Result object wrapping a CassResult
 VALUE result_new(CassResult* result) {
-    VALUE rb_result = result_allocate(rb_cResult);
+    VALUE rb_result = result_allocate(cCassResult);
     return result_initialize(rb_result, ULL2NUM((unsigned long long)result));
 }
 
@@ -135,15 +135,15 @@ static VALUE result_each(VALUE self) {
 
 // Initialize the Result class
 void Init_cassandra_c_result(VALUE mCassandraC) {
-    rb_cResult = rb_define_class_under(mCassandraC, "Result", rb_cObject);
-    rb_define_alloc_func(rb_cResult, result_allocate);
-    rb_define_method(rb_cResult, "initialize", result_initialize, 1);
-    rb_define_method(rb_cResult, "row_count", result_row_count, 0);
-    rb_define_method(rb_cResult, "column_count", result_column_count, 0);
-    rb_define_method(rb_cResult, "has_more_pages?", result_has_more_pages, 0);
-    rb_define_method(rb_cResult, "column_names", result_column_names, 0);
-    rb_define_method(rb_cResult, "each", result_each, 0);
+    cCassResult = rb_define_class_under(mCassandraC, "Result", rb_cObject);
+    rb_define_alloc_func(cCassResult, result_allocate);
+    rb_define_method(cCassResult, "initialize", result_initialize, 1);
+    rb_define_method(cCassResult, "row_count", result_row_count, 0);
+    rb_define_method(cCassResult, "column_count", result_column_count, 0);
+    rb_define_method(cCassResult, "has_more_pages?", result_has_more_pages, 0);
+    rb_define_method(cCassResult, "column_names", result_column_names, 0);
+    rb_define_method(cCassResult, "each", result_each, 0);
     
     // Include Enumerable to get all the Enumerable methods
-    rb_include_module(rb_cResult, rb_mEnumerable);
+    rb_include_module(cCassResult, rb_mEnumerable);
 }

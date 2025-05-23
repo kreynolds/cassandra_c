@@ -1,6 +1,6 @@
 #include "cassandra_c.h"
 
-VALUE rb_cPrepared;
+VALUE cCassPrepared;
 
 // Free function for Prepared
 static void prepared_free(void* ptr) {
@@ -19,7 +19,6 @@ const rb_data_type_t prepared_type = {
         .dfree = prepared_free,
         .dsize = NULL,
     },
-    .parent = NULL,
     .data = NULL,
     .flags = RUBY_TYPED_FREE_IMMEDIATELY
 };
@@ -31,14 +30,32 @@ static VALUE prepared_allocate(VALUE klass) {
 }
 
 VALUE prepared_new(const CassPrepared* prepared) {
-    VALUE rb_prepared = prepared_allocate(rb_cPrepared);
+    VALUE rb_prepared = prepared_allocate(cCassPrepared);
     PreparedWrapper* wrapper;
     TypedData_Get_Struct(rb_prepared, PreparedWrapper, &prepared_type, wrapper);
     wrapper->prepared = prepared;
     return rb_prepared;
 }
 
+// Bind method - creates a statement from this prepared statement
+static VALUE prepared_bind(VALUE self) {
+    PreparedWrapper* wrapper;
+    TypedData_Get_Struct(self, PreparedWrapper, &prepared_type, wrapper);
+    
+    if (wrapper->prepared == NULL) {
+        rb_raise(rb_eCassandraError, "Prepared statement is NULL");
+    }
+    
+    CassStatement* statement = cass_prepared_bind(wrapper->prepared);
+    if (statement == NULL) {
+        rb_raise(rb_eCassandraError, "Failed to bind prepared statement");
+    }
+    
+    return statement_new(statement);
+}
+
 void Init_cassandra_c_prepared(VALUE mCassandraC) {
-    rb_cPrepared = rb_define_class_under(mCassandraC, "Prepared", rb_cObject);
-    rb_define_alloc_func(rb_cPrepared, prepared_allocate);
+    cCassPrepared = rb_define_class_under(mCassandraC, "Prepared", rb_cObject);
+    rb_define_alloc_func(cCassPrepared, prepared_allocate);
+    rb_define_method(cCassPrepared, "bind", prepared_bind, 0);
 }

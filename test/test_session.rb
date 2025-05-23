@@ -27,7 +27,8 @@ class TestSession < Minitest::Test
 
   def test_should_return_a_prepared_statement_async
     connect!
-    statement = @session.prepare("SELECT * FROM system_schema.tables")
+    prepared = @session.prepare("SELECT * FROM system_schema.tables")
+    assert_kind_of CassandraC::Prepared, prepared
   end
 
   def test_prepared_statement_should_return_client_id

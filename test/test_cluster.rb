@@ -34,32 +34,32 @@ class TestCluster < Minitest::Test
 
     assert true
   end
-  
+
   def test_round_robin_load_balancing
     cluster = CassandraC::Cluster.new
     cluster.use_round_robin_load_balancing
     assert true
   end
-  
+
   def test_dc_aware_load_balancing
     cluster = CassandraC::Cluster.new
-    
+
     # Test with different datacenter names
     cluster.use_dc_aware_load_balancing("dc1")
     cluster.use_dc_aware_load_balancing("local-dc")
     cluster.use_dc_aware_load_balancing("datacenter1")
-    
+
     assert true
   end
-  
+
   def test_dc_aware_load_balancing_invalid_params
     cluster = CassandraC::Cluster.new
-    
+
     # Test with invalid local_dc type
     assert_raises(TypeError) do
       cluster.use_dc_aware_load_balancing(123)
     end
-    
+
     assert true
   end
 end
