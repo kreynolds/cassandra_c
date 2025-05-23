@@ -1,28 +1,32 @@
 #include "cassandra_c.h"
 
+/*
+ * CassandraC Ruby Extension - Main Module
+ *
+ * This file contains the main initialization code for the CassandraC Ruby extension.
+ * It sets up the module structure, defines constants, and initializes all sub-components.
+ */
+
+// ============================================================================
+// Module and Exception Definitions
+// ============================================================================
+
 VALUE mCassandraC;
 VALUE rb_eCassandraError;
+
+// ============================================================================
+// Error Handling
+// ============================================================================
 
 void raise_cassandra_error(CassError error, const char* message) {
     const char* error_desc = cass_error_desc(error);
     rb_raise(rb_eCassandraError, "%s: %s", message, error_desc);
 }
 
-// RUBY_FUNC_EXPORTED void
+// ============================================================================
+// Constants Definition
+// ============================================================================
 
-// Function prototypes for initialization functions
-void Init_cassandra_c_cluster(VALUE mCassandraC);
-void Init_cassandra_c_session(VALUE mCassandraC);
-void Init_cassandra_c_future(VALUE mCassandraC);
-void Init_cassandra_c_result(VALUE mCassandraC);
-void Init_cassandra_c_prepared(VALUE mCassandraC);
-void Init_cassandra_c_statement(VALUE mCassandraC);
-void Init_cassandra_c_retry_policy(VALUE mCassandraC);
-// No initialization needed for value.c, just functions
-// void Init_cassandra_c_batch_statement(VALUE mCassandraC);
-// void Init_cassandra_c_load_balancing_policy(VALUE mCassandraC);
-
-// Define consistency constants
 static void define_consistency_constants(VALUE mCassandraC) {
     VALUE mConsistency = rb_define_module_under(mCassandraC, "Consistency");
     
@@ -39,21 +43,25 @@ static void define_consistency_constants(VALUE mCassandraC) {
     rb_define_const(mConsistency, "LOCAL_ONE", INT2NUM(CASS_CONSISTENCY_LOCAL_ONE));
 }
 
+// ============================================================================
+// Main Extension Initialization
+// ============================================================================
+
 void Init_cassandra_c(void) {
+    // Create the main CassandraC module
     mCassandraC = rb_define_module("CassandraC");
 
+    // Define the main exception class
     rb_eCassandraError = rb_define_class_under(mCassandraC, "Error", rb_eRuntimeError);
     
-    // Define constants
+    // Define module constants
     define_consistency_constants(mCassandraC);
 
-    // Initialize components
+    // Initialize all sub-components
     Init_cassandra_c_cluster(mCassandraC);
     Init_cassandra_c_session(mCassandraC);
     Init_cassandra_c_future(mCassandraC);
     Init_cassandra_c_result(mCassandraC);
     Init_cassandra_c_prepared(mCassandraC);
     Init_cassandra_c_statement(mCassandraC);
-    // Init_cassandra_c_batch_statement(mCassandraC);
-    // Init_cassandra_c_load_balancing_policy(mCassandraC);
 }

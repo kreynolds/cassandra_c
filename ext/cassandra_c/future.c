@@ -1,6 +1,6 @@
 #include "cassandra_c.h"
 
-VALUE rb_cFuture;
+VALUE cCassFuture;
 
 // Free function for Future
 static void future_free(void* ptr) {
@@ -31,7 +31,7 @@ static VALUE future_allocate(VALUE klass) {
 }
 
 VALUE future_new(CassFuture* future) {
-    VALUE rb_future = future_allocate(rb_cFuture);
+    VALUE rb_future = future_allocate(cCassFuture);
     FutureWrapper* wrapper;
     TypedData_Get_Struct(rb_future, FutureWrapper, &future_type, wrapper);
     wrapper->future = future;
@@ -95,10 +95,8 @@ static VALUE future_get_result(VALUE self) {
         return Qnil;
     }
 
-    // Assuming you have a function to create a Ruby Result object
-    return Qnil;
-    // TODO: This should return a result
-    // return rb_result_new(result);
+    // Cast away const since we transfer ownership to Ruby's GC via result_new
+    return result_new((CassResult*)result);
 }
 
 // Get the prepared statement from the Future
@@ -142,14 +140,14 @@ static VALUE future_tracing_id(VALUE self) {
 
 // Initialize the Future class
 void Init_cassandra_c_future(VALUE mCassandraC) {
-    rb_cFuture = rb_define_class_under(mCassandraC, "Future", rb_cObject);
-    rb_define_alloc_func(rb_cFuture, future_allocate);
-    rb_define_method(rb_cFuture, "ready?", future_ready, 0);
-    rb_define_method(rb_cFuture, "wait", future_wait, 0);
-    rb_define_method(rb_cFuture, "wait_timed", future_wait_timed, 1);
-    rb_define_method(rb_cFuture, "error_code", future_error_code, 0);
-    rb_define_method(rb_cFuture, "error_message", future_error_message, 0);
-    rb_define_method(rb_cFuture, "get_result", future_get_result, 0);
-    rb_define_method(rb_cFuture, "get_prepared", future_get_prepared, 0);
-    rb_define_method(rb_cFuture, "tracing_id", future_tracing_id, 0);
+    cCassFuture = rb_define_class_under(mCassandraC, "Future", rb_cObject);
+    rb_define_alloc_func(cCassFuture, future_allocate);
+    rb_define_method(cCassFuture, "ready?", future_ready, 0);
+    rb_define_method(cCassFuture, "wait", future_wait, 0);
+    rb_define_method(cCassFuture, "wait_timed", future_wait_timed, 1);
+    rb_define_method(cCassFuture, "error_code", future_error_code, 0);
+    rb_define_method(cCassFuture, "error_message", future_error_message, 0);
+    rb_define_method(cCassFuture, "get_result", future_get_result, 0);
+    rb_define_method(cCassFuture, "get_prepared", future_get_prepared, 0);
+    rb_define_method(cCassFuture, "tracing_id", future_tracing_id, 0);
 }
