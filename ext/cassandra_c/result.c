@@ -134,8 +134,8 @@ static VALUE result_each(VALUE self) {
 }
 
 // Initialize the Result class
-void Init_cassandra_c_result(VALUE mCassandraC) {
-    cCassResult = rb_define_class_under(mCassandraC, "Result", rb_cObject);
+void Init_cassandra_c_result(VALUE module) {
+    cCassResult = rb_define_class_under(module, "Result", rb_cObject);
     rb_define_alloc_func(cCassResult, result_allocate);
     rb_define_method(cCassResult, "initialize", result_initialize, 1);
     rb_define_method(cCassResult, "row_count", result_row_count, 0);

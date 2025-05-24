@@ -68,11 +68,7 @@ static VALUE rb_session_connect(int argc, VALUE* argv, VALUE self) {
         // Check for errors during connection
         CassError error = cass_future_error_code(connect_future);
         if (error != CASS_OK) {
-            const char* message;
-            size_t message_length;
-            cass_future_error_message(connect_future, &message, &message_length);
-            cass_future_free(connect_future);
-            rb_raise(rb_eCassandraError, "Failed to connect to Cassandra: %.*s", (int)message_length, message);
+            raise_future_error(connect_future, "Failed to connect to Cassandra");
         }
 
         cass_future_free(connect_future);
@@ -91,11 +87,7 @@ static VALUE rb_session_close(VALUE self) {
 
         CassError error = cass_future_error_code(close_future);
         if (error != CASS_OK) {
-            const char* message;
-            size_t message_length;
-            cass_future_error_message(close_future, &message, &message_length);
-            cass_future_free(close_future);
-            rb_raise(rb_eCassandraError, "Failed to close Cassandra session: %.*s", (int)message_length, message);
+            raise_future_error(close_future, "Failed to close Cassandra session");
         }
 
         cass_future_free(close_future);
@@ -132,11 +124,7 @@ static VALUE rb_session_prepare(int argc, VALUE* argv, VALUE self) {
         // Check for errors during preparation
         CassError error = cass_future_error_code(prepare_future);
         if (error != CASS_OK) {
-            const char* message;
-            size_t message_length;
-            cass_future_error_message(prepare_future, &message, &message_length);
-            cass_future_free(prepare_future);
-            rb_raise(rb_eCassandraError, "Failed to prepare statement: %.*s", (int)message_length, message);
+            raise_future_error(prepare_future, "Failed to prepare statement");
         }
 
         const CassPrepared* prepared = cass_future_get_prepared(prepare_future);
@@ -221,11 +209,7 @@ static VALUE rb_session_execute(int argc, VALUE* argv, VALUE self) {
         // Check for errors
         CassError error = cass_future_error_code(future);
         if (error != CASS_OK) {
-            const char* message;
-            size_t message_length;
-            cass_future_error_message(future, &message, &message_length);
-            cass_future_free(future);
-            rb_raise(rb_eCassandraError, "Failed to execute statement: %.*s", (int)message_length, message);
+            raise_future_error(future, "Failed to execute statement");
         }
 
         // Get the result
@@ -245,8 +229,8 @@ static VALUE rb_session_query(int argc, VALUE* argv, VALUE self) {
 }
 
 // Initialize the Session class within the CassandraC module
-void Init_cassandra_c_session(VALUE mCassandraC) {
-    VALUE cSession = rb_define_class_under(mCassandraC, "Session", rb_cObject);
+void Init_cassandra_c_session(VALUE module) {
+    VALUE cSession = rb_define_class_under(module, "Session", rb_cObject);
  
     rb_define_alloc_func(cSession, rb_session_allocate);
     rb_define_method(cSession, "initialize", rb_session_initialize, 0);

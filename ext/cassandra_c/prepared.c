@@ -38,7 +38,10 @@ VALUE prepared_new(const CassPrepared* prepared) {
 }
 
 // Bind method - creates a statement from this prepared statement
-static VALUE prepared_bind(VALUE self) {
+static VALUE prepared_bind(int argc, VALUE* argv, VALUE self) {
+    VALUE params;
+    rb_scan_args(argc, argv, "01", &params);
+    
     PreparedWrapper* wrapper;
     TypedData_Get_Struct(self, PreparedWrapper, &prepared_type, wrapper);
     
@@ -51,11 +54,30 @@ static VALUE prepared_bind(VALUE self) {
         rb_raise(rb_eCassandraError, "Failed to bind prepared statement");
     }
     
+    // If parameters were provided, bind them
+    if (!NIL_P(params)) {
+        if (TYPE(params) != T_ARRAY) {
+            cass_statement_free(statement);
+            rb_raise(rb_eArgError, "Parameters must be an array");
+        }
+        
+        long param_count = RARRAY_LEN(params);
+        for (long i = 0; i < param_count; i++) {
+            VALUE param = rb_ary_entry(params, i);
+            CassError error = ruby_value_to_cass_statement(statement, (size_t)i, param);
+            if (error != CASS_OK) {
+                cass_statement_free(statement);
+                rb_raise(rb_eCassandraError, "Failed to bind parameter at index %ld: %s", 
+                         i, cass_error_desc(error));
+            }
+        }
+    }
+    
     return statement_new(statement);
 }
 
-void Init_cassandra_c_prepared(VALUE mCassandraC) {
-    cCassPrepared = rb_define_class_under(mCassandraC, "Prepared", rb_cObject);
+void Init_cassandra_c_prepared(VALUE module) {
+    cCassPrepared = rb_define_class_under(module, "Prepared", rb_cObject);
     rb_define_alloc_func(cCassPrepared, prepared_allocate);
-    rb_define_method(cCassPrepared, "bind", prepared_bind, 0);
+    rb_define_method(cCassPrepared, "bind", prepared_bind, -1);
 }

@@ -17,6 +17,7 @@
 // ============================================================================
 
 extern VALUE mCassandraC;
+extern VALUE mCassandraCNative;
 extern VALUE rb_eCassandraError;
 
 // ============================================================================
@@ -79,6 +80,7 @@ extern VALUE cCassPrepared;
 
 // Error handling
 void raise_cassandra_error(CassError error, const char* message) __attribute__((noreturn));
+void raise_future_error(CassFuture* future, const char* prefix) __attribute__((noreturn));
 
 // Object creation functions
 VALUE future_new(CassFuture* future);
@@ -88,16 +90,24 @@ VALUE result_new(CassResult* result);
 
 // Value conversion
 VALUE cass_value_to_ruby(const CassValue* value);
+CassError ruby_value_to_cass_statement(CassStatement* statement, size_t index, VALUE rb_value);
+CassError ruby_value_to_cass_statement_by_name(CassStatement* statement, const char* name, VALUE rb_value);
+
+// Type-specific binding functions
+CassError ruby_string_to_cass_text(CassStatement* statement, size_t index, VALUE rb_value);
+CassError ruby_string_to_cass_text_by_name(CassStatement* statement, const char* name, VALUE rb_value);
+CassError ruby_string_to_cass_ascii(CassStatement* statement, size_t index, VALUE rb_value);
+CassError ruby_string_to_cass_ascii_by_name(CassStatement* statement, const char* name, VALUE rb_value);
 
 // ============================================================================
 // Module Initialization Functions
 // ============================================================================
 
-void Init_cassandra_c_cluster(VALUE mCassandraC);
-void Init_cassandra_c_session(VALUE mCassandraC);
-void Init_cassandra_c_future(VALUE mCassandraC);
-void Init_cassandra_c_prepared(VALUE mCassandraC);
-void Init_cassandra_c_statement(VALUE mCassandraC);
-void Init_cassandra_c_result(VALUE mCassandraC);
+void Init_cassandra_c_cluster(VALUE module);
+void Init_cassandra_c_session(VALUE module);
+void Init_cassandra_c_future(VALUE module);
+void Init_cassandra_c_prepared(VALUE module);
+void Init_cassandra_c_statement(VALUE module);
+void Init_cassandra_c_result(VALUE module);
 
 #endif /* CASSANDRA_C_H */

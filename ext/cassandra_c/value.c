@@ -1,4 +1,75 @@
 #include "cassandra_c.h"
+#include <string.h>
+
+// Helper function to validate that a string contains only ASCII characters
+static int is_ascii_string(const char* str, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        if ((unsigned char)str[i] > 127) {
+            return 0; // Non-ASCII character found
+        }
+    }
+    return 1; // All characters are ASCII
+}
+
+// Helper function to bind a Ruby value to a CassStatement at a given index
+CassError ruby_value_to_cass_statement(CassStatement* statement, size_t index, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null(statement, index);
+    }
+    
+    switch (TYPE(rb_value)) {
+        case T_STRING: {
+            const char* str = RSTRING_PTR(rb_value);
+            size_t len = RSTRING_LEN(rb_value);
+            return cass_statement_bind_string_n(statement, index, str, len);
+        }
+        case T_FLOAT: {
+            double val = NUM2DBL(rb_value);
+            return cass_statement_bind_double(statement, index, val);
+        }
+        case T_TRUE:
+            return cass_statement_bind_bool(statement, index, cass_true);
+        case T_FALSE:
+            return cass_statement_bind_bool(statement, index, cass_false);
+        default: {
+            // Try to convert to string as fallback
+            VALUE str_val = rb_obj_as_string(rb_value);
+            const char* str = RSTRING_PTR(str_val);
+            size_t len = RSTRING_LEN(str_val);
+            return cass_statement_bind_string_n(statement, index, str, len);
+        }
+    }
+}
+
+// Helper function to bind a Ruby value to a CassStatement by name
+CassError ruby_value_to_cass_statement_by_name(CassStatement* statement, const char* name, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null_by_name(statement, name);
+    }
+    
+    switch (TYPE(rb_value)) {
+        case T_STRING: {
+            const char* str = RSTRING_PTR(rb_value);
+            size_t len = RSTRING_LEN(rb_value);
+            return cass_statement_bind_string_by_name_n(statement, name, strlen(name), str, len);
+        }
+        case T_FLOAT: {
+            double val = NUM2DBL(rb_value);
+            return cass_statement_bind_double_by_name(statement, name, val);
+        }
+        case T_TRUE:
+            return cass_statement_bind_bool_by_name(statement, name, cass_true);
+        case T_FALSE:
+            return cass_statement_bind_bool_by_name(statement, name, cass_false);
+        default: {
+            // Try to convert to string as fallback
+            VALUE str_val = rb_obj_as_string(rb_value);
+            const char* str = RSTRING_PTR(str_val);
+            size_t len = RSTRING_LEN(str_val);
+            return cass_statement_bind_string_by_name_n(statement, name, strlen(name), str, len);
+        }
+    }
+}
 
 // Helper function to convert a CassValue to a Ruby object
 VALUE cass_value_to_ruby(const CassValue* value) {
@@ -65,4 +136,70 @@ VALUE cass_value_to_ruby(const CassValue* value) {
     }
     
     return rb_value;
+}
+
+// Type-specific binding functions for text/varchar (UTF-8 strings)
+CassError ruby_string_to_cass_text(CassStatement* statement, size_t index, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null(statement, index);
+    }
+    
+    Check_Type(rb_value, T_STRING);
+    
+    const char* str = RSTRING_PTR(rb_value);
+    size_t len = RSTRING_LEN(rb_value);
+    
+    // Text/varchar accepts any UTF-8 string
+    return cass_statement_bind_string_n(statement, index, str, len);
+}
+
+CassError ruby_string_to_cass_text_by_name(CassStatement* statement, const char* name, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null_by_name(statement, name);
+    }
+    
+    Check_Type(rb_value, T_STRING);
+    
+    const char* str = RSTRING_PTR(rb_value);
+    size_t len = RSTRING_LEN(rb_value);
+    
+    // Text/varchar accepts any UTF-8 string
+    return cass_statement_bind_string_by_name_n(statement, name, strlen(name), str, len);
+}
+
+// Type-specific binding functions for ASCII strings
+CassError ruby_string_to_cass_ascii(CassStatement* statement, size_t index, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null(statement, index);
+    }
+    
+    Check_Type(rb_value, T_STRING);
+    
+    const char* str = RSTRING_PTR(rb_value);
+    size_t len = RSTRING_LEN(rb_value);
+    
+    // ASCII type requires validation - only 7-bit ASCII characters allowed
+    if (!is_ascii_string(str, len)) {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    return cass_statement_bind_string_n(statement, index, str, len);
+}
+
+CassError ruby_string_to_cass_ascii_by_name(CassStatement* statement, const char* name, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null_by_name(statement, name);
+    }
+    
+    Check_Type(rb_value, T_STRING);
+    
+    const char* str = RSTRING_PTR(rb_value);
+    size_t len = RSTRING_LEN(rb_value);
+    
+    // ASCII type requires validation - only 7-bit ASCII characters allowed
+    if (!is_ascii_string(str, len)) {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    return cass_statement_bind_string_by_name_n(statement, name, strlen(name), str, len);
 }

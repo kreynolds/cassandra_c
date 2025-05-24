@@ -248,11 +248,11 @@ static void init_consistency_map() {
     rb_hash_freeze(consistency_map);
 }
 
-void Init_cassandra_c_cluster(VALUE mCassandraC) {
+void Init_cassandra_c_cluster(VALUE module) {
     // Initialize the consistency map
     init_consistency_map();
     
-    VALUE cCluster = rb_define_class_under(mCassandraC, "Cluster", rb_cObject);
+    VALUE cCluster = rb_define_class_under(module, "Cluster", rb_cObject);
     
     rb_define_alloc_func(cCluster, rb_cluster_allocate);
     rb_define_method(cCluster, "initialize", rb_cluster_initialize, 0);

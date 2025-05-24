@@ -2,19 +2,49 @@
 
 This document outlines all features and improvements needed to make CassandraC a production-ready Cassandra driver for Ruby.
 
-## ✅ Already Implemented
+## 🏗️ Architecture Strategy
 
-### Core Components
+**Native vs Idiomatic Approach**: We follow a two-layer architecture:
+
+1. **CassandraC::Native** - Low-level faithful bindings to the DataStax C/C++ driver
+   - Direct exposure of C driver functionality
+   - Minimal Ruby abstraction for maximum performance
+   - Used as foundation for higher-level wrappers
+
+2. **CassandraC** (Future) - Idiomatic Ruby interface layer
+   - Ruby-friendly API with blocks, enumerables, and conventions
+   - Built on top of Native layer
+   - Convenience methods and syntactic sugar
+
+**Current Priority**: Complete and stabilize the Native layer before building idiomatic wrappers.
+
+## ✅ Recently Completed
+
+### Core Components  
 - [x] **Cluster Configuration**: Basic cluster setup with contact points, port, protocol version
 - [x] **Session Management**: Connect, disconnect, client ID retrieval
 - [x] **Basic Query Execution**: Simple queries and prepared statements
 - [x] **Async Operations**: Future-based async support for connect, prepare, execute
 - [x] **Data Type Wrappers**: Basic Ruby typed data wrappers for memory management
-- [x] **Error Handling**: Basic error propagation from Cassandra C driver
+- [x] **Error Handling**: Robust error propagation with proper memory management
 - [x] **Consistency Levels**: Symbol and integer-based consistency level setting
 - [x] **Load Balancing**: Round-robin and DC-aware load balancing policies
 - [x] **Retry Policies**: Default, fallthrough, and logging retry policies
 - [x] **Memory Management**: Proper cleanup with RUBY_TYPED_FREE_IMMEDIATELY
+
+### Parameter Binding (NEW ✅)
+- [x] **Prepared Statement Parameter Binding**: 
+  - [x] Array-based parameter binding in `prepared.bind([params])`
+  - [x] Index-based binding with `statement.bind_by_index(index, value)`
+  - [x] Named parameter binding with `statement.bind_by_name(name, value)`
+  - [x] Support for string, float, boolean, and nil values
+  - [x] Proper error handling and validation
+
+### Development Infrastructure (NEW ✅)
+- [x] **Namespace Architecture**: All C driver bindings moved to `CassandraC::Native`
+- [x] **Test Organization**: Comprehensive test suite with proper table schemas
+- [x] **Error Message Handling**: Centralized `raise_future_error()` helper for consistent error handling
+- [x] **Memory Safety**: Fixed corruption issues in error message extraction
 
 ## 🚧 Core Driver Features (High Priority)
 
@@ -37,7 +67,7 @@ This document outlines all features and improvements needed to make CassandraC a
 
 ### Data Types & Value Conversion
 - [ ] **Complete Data Type Support**:
-  - [ ] Text/varchar types ✅ (basic support exists)
+  - [x] **Text/varchar/ASCII types** ✅ (Complete with UTF-8 and ASCII validation, multibyte character support)
   - [ ] Integer types (tinyint, smallint, int, bigint, varint)
   - [ ] Floating point types (float, double, decimal)
   - [ ] Boolean type
@@ -62,12 +92,13 @@ This document outlines all features and improvements needed to make CassandraC a
   - [ ] Tuple element access
 
 ### Statement Types & Parameter Binding
-- [ ] **Simple Statements**: ✅ (basic support exists)
-- [ ] **Prepared Statements**: ✅ (basic support exists, needs enhancement)
-  - [ ] Parameter binding by index
-  - [ ] Parameter binding by name
-  - [ ] Null value binding
+- [x] **Simple Statements**: ✅ (complete)
+- [x] **Prepared Statements**: ✅ (basic support complete)
+  - [x] Parameter binding by index
+  - [x] Parameter binding by name  
+  - [x] Null value binding
   - [ ] Collection parameter binding
+  - [ ] Additional numeric type binding (int, bigint, etc.)
 - [ ] **Batch Statements**:
   - [ ] Logged batch support
   - [ ] Unlogged batch support

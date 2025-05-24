@@ -12,6 +12,7 @@
 // ============================================================================
 
 VALUE mCassandraC;
+VALUE mCassandraCNative;
 VALUE rb_eCassandraError;
 
 // ============================================================================
@@ -21,6 +22,24 @@ VALUE rb_eCassandraError;
 void raise_cassandra_error(CassError error, const char* message) {
     const char* error_desc = cass_error_desc(error);
     rb_raise(rb_eCassandraError, "%s: %s", message, error_desc);
+}
+
+void raise_future_error(CassFuture* future, const char* prefix) {
+    const char* message;
+    size_t message_length;
+    cass_future_error_message(future, &message, &message_length);
+    
+    char* message_copy = malloc(message_length + 1);
+    if (message_copy != NULL) {
+        memcpy(message_copy, message, message_length);
+        message_copy[message_length] = '\0';
+        cass_future_free(future);
+        rb_raise(rb_eCassandraError, "%s: %s", prefix, message_copy);
+        free(message_copy);  // Not reached
+    } else {
+        cass_future_free(future);
+        rb_raise(rb_eCassandraError, "%s: (memory allocation failed for error message)", prefix);
+    }
 }
 
 // ============================================================================
@@ -51,17 +70,20 @@ void Init_cassandra_c(void) {
     // Create the main CassandraC module
     mCassandraC = rb_define_module("CassandraC");
 
+    // Create the Native sub-module for low-level bindings
+    mCassandraCNative = rb_define_module_under(mCassandraC, "Native");
+
     // Define the main exception class
     rb_eCassandraError = rb_define_class_under(mCassandraC, "Error", rb_eRuntimeError);
     
     // Define module constants
     define_consistency_constants(mCassandraC);
 
-    // Initialize all sub-components
-    Init_cassandra_c_cluster(mCassandraC);
-    Init_cassandra_c_session(mCassandraC);
-    Init_cassandra_c_future(mCassandraC);
-    Init_cassandra_c_result(mCassandraC);
-    Init_cassandra_c_prepared(mCassandraC);
-    Init_cassandra_c_statement(mCassandraC);
+    // Initialize all sub-components under the Native module
+    Init_cassandra_c_cluster(mCassandraCNative);
+    Init_cassandra_c_session(mCassandraCNative);
+    Init_cassandra_c_future(mCassandraCNative);
+    Init_cassandra_c_result(mCassandraCNative);
+    Init_cassandra_c_prepared(mCassandraCNative);
+    Init_cassandra_c_statement(mCassandraCNative);
 }

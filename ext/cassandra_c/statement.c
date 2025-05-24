@@ -97,12 +97,151 @@ static VALUE rb_statement_set_consistency(VALUE self, VALUE consistency) {
     return self;
 }
 
+// Bind a value by index
+static VALUE rb_statement_bind_by_index(VALUE self, VALUE index, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    size_t param_index = NUM2SIZET(index);
+    CassError error = ruby_value_to_cass_statement(wrapper->statement, param_index, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind parameter at index %zu: %s", 
+                 param_index, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a value by name
+static VALUE rb_statement_bind_by_name(VALUE self, VALUE name, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    Check_Type(name, T_STRING);
+    const char* param_name = StringValueCStr(name);
+    CassError error = ruby_value_to_cass_statement_by_name(wrapper->statement, param_name, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind parameter '%s': %s", 
+                 param_name, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a text/varchar value by index (UTF-8 strings)
+static VALUE rb_statement_bind_text_by_index(VALUE self, VALUE index, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    size_t param_index = NUM2SIZET(index);
+    CassError error = ruby_string_to_cass_text(wrapper->statement, param_index, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind text parameter at index %zu: %s", 
+                 param_index, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a text/varchar value by name (UTF-8 strings)
+static VALUE rb_statement_bind_text_by_name(VALUE self, VALUE name, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    Check_Type(name, T_STRING);
+    const char* param_name = StringValueCStr(name);
+    CassError error = ruby_string_to_cass_text_by_name(wrapper->statement, param_name, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind text parameter '%s': %s", 
+                 param_name, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind an ASCII value by index (ASCII-only strings)
+static VALUE rb_statement_bind_ascii_by_index(VALUE self, VALUE index, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    size_t param_index = NUM2SIZET(index);
+    CassError error = ruby_string_to_cass_ascii(wrapper->statement, param_index, value);
+    
+    if (error != CASS_OK) {
+        if (error == CASS_ERROR_LIB_INVALID_VALUE_TYPE) {
+            rb_raise(rb_eCassandraError, "Failed to bind ASCII parameter at index %zu: String contains non-ASCII characters", param_index);
+        } else {
+            rb_raise(rb_eCassandraError, "Failed to bind ASCII parameter at index %zu: %s", 
+                     param_index, cass_error_desc(error));
+        }
+    }
+    
+    return self;
+}
+
+// Bind an ASCII value by name (ASCII-only strings)
+static VALUE rb_statement_bind_ascii_by_name(VALUE self, VALUE name, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    Check_Type(name, T_STRING);
+    const char* param_name = StringValueCStr(name);
+    CassError error = ruby_string_to_cass_ascii_by_name(wrapper->statement, param_name, value);
+    
+    if (error != CASS_OK) {
+        if (error == CASS_ERROR_LIB_INVALID_VALUE_TYPE) {
+            rb_raise(rb_eCassandraError, "Failed to bind ASCII parameter '%s': String contains non-ASCII characters", param_name);
+        } else {
+            rb_raise(rb_eCassandraError, "Failed to bind ASCII parameter '%s': %s", 
+                     param_name, cass_error_desc(error));
+        }
+    }
+    
+    return self;
+}
+
 // Initialize the Statement class within the CassandraC module
 VALUE cCassStatement;
-void Init_cassandra_c_statement(VALUE mCassandraC) {
-    cCassStatement = rb_define_class_under(mCassandraC, "Statement", rb_cObject);
+void Init_cassandra_c_statement(VALUE module) {
+    cCassStatement = rb_define_class_under(module, "Statement", rb_cObject);
     
     rb_define_alloc_func(cCassStatement, rb_statement_allocate);
     rb_define_method(cCassStatement, "initialize", rb_statement_initialize, -1);
     rb_define_method(cCassStatement, "consistency=", rb_statement_set_consistency, 1);
+    rb_define_method(cCassStatement, "bind_by_index", rb_statement_bind_by_index, 2);
+    rb_define_method(cCassStatement, "bind_by_name", rb_statement_bind_by_name, 2);
+    
+    // Type-specific binding methods
+    rb_define_method(cCassStatement, "bind_text_by_index", rb_statement_bind_text_by_index, 2);
+    rb_define_method(cCassStatement, "bind_text_by_name", rb_statement_bind_text_by_name, 2);
+    rb_define_method(cCassStatement, "bind_ascii_by_index", rb_statement_bind_ascii_by_index, 2);
+    rb_define_method(cCassStatement, "bind_ascii_by_name", rb_statement_bind_ascii_by_name, 2);
 }

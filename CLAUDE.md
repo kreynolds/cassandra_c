@@ -53,11 +53,14 @@ docker-compose up -d
 # Run all tests
 bundle exec rake test
 
-# Run a specific test file
-bundle exec ruby -Itest test/test_session.rb
+# Run native layer tests only
+bundle exec ruby -Itest test/native/test_session.rb
 
 # Run a specific test
-bundle exec ruby -Itest test/test_session.rb -n test_connects_and_disconnects
+bundle exec ruby -Itest test/native/test_session.rb -n test_connects_and_disconnects
+
+# Run specific test suites
+bundle exec rake test TEST="test/native/**/*.rb"
 ```
 
 ### Code Quality
@@ -79,17 +82,25 @@ bundle exec rake
 
 ## Architecture
 
-The gem has the following main components:
+The gem follows a two-layer architecture:
 
-1. **Core Module** (`lib/cassandra_c.rb`): Main entry point for the gem
-2. **C Extension** (`ext/cassandra_c/*.c`): Native bindings to the Cassandra C/C++ driver
-3. **Ruby Interface Classes**:
-   - `CassandraC::Cluster`: Manages cluster connections
-   - `CassandraC::Session`: Handles query execution and prepared statements
-   - `CassandraC::Future`: Async operation handler
-   - `CassandraC::Statement`: Represents a CQL statement
-   - `CassandraC::PreparedStatement`: Pre-parsed CQL statement
-   - `CassandraC::Result`: Query results
+### Native Layer (`CassandraC::Native`)
+Low-level faithful bindings to the DataStax C/C++ driver:
+- **`CassandraC::Native::Cluster`**: Cluster configuration and connection management
+- **`CassandraC::Native::Session`**: Query execution and session management  
+- **`CassandraC::Native::Future`**: Async operation handling
+- **`CassandraC::Native::Statement`**: CQL statement representation
+- **`CassandraC::Native::Prepared`**: Prepared statement management
+- **`CassandraC::Native::Result`**: Query result processing
+
+### Idiomatic Layer (`CassandraC`) - Future
+Ruby-friendly interface built on top of the Native layer:
+- Enumerable result sets
+- Block-based iteration
+- Method chaining
+- Ruby naming conventions
+
+**Current Focus**: Completing and stabilizing the Native layer before building idiomatic wrappers.
 
 ### Extension Structure
 
@@ -108,30 +119,46 @@ The C extension uses Ruby's typed data to properly manage memory and ensure reso
 
 ## Usage Example
 
+### Native Layer Usage
+
 ```ruby
 require 'cassandra_c'
 
-# Create cluster configuration
-cluster = CassandraC::Cluster.new
+# Create cluster configuration (Native layer)
+cluster = CassandraC::Native::Cluster.new
 cluster.contact_points = "127.0.0.1"
 cluster.port = 9042
 
 # Create session and connect
-session = CassandraC::Session.new
+session = CassandraC::Native::Session.new
 session.connect(cluster)
 
 # Execute a simple query
 result = session.query("SELECT * FROM system_schema.tables")
 
-# Prepare a statement
+# Prepare a statement with parameter binding
 prepared = session.prepare("SELECT * FROM system_schema.keyspaces WHERE keyspace_name = ?")
 
-# Create a statement from the prepared statement
-statement = prepared.bind("system")
-
-# Execute the prepared statement
+# Bind parameters and execute
+statement = prepared.bind(["system"])
 result = session.execute(statement)
+
+# Alternative parameter binding approaches
+statement = prepared.bind
+statement.bind_by_index(0, "system")
+# or
+statement.bind_by_name("keyspace_name", "system")
 
 # Close the session when done
 session.close
 ```
+
+### Test Structure
+
+Tests are organized by namespace:
+- `test/` - Main module tests
+- `test/native/` - Native layer tests (CassandraC::Native::*)
+  - `test_session.rb` - Session functionality tests
+  - `test_cluster.rb` - Cluster configuration tests
+  - `test_statement.rb` - Statement and binding tests
+  - `test_retry_policy.rb` - Retry policy tests

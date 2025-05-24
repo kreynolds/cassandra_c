@@ -4,7 +4,7 @@ require "test_helper"
 
 class TestCluster < Minitest::Test
   def test_basic_setters
-    cluster = CassandraC::Cluster.new
+    cluster = CassandraC::Native::Cluster.new
     cluster.contact_points = "127.0.0.1"
     cluster.port = 9042
     cluster.protocol_version = 4
@@ -14,13 +14,13 @@ class TestCluster < Minitest::Test
   end
 
   def test_local_address
-    cluster = CassandraC::Cluster.new
+    cluster = CassandraC::Native::Cluster.new
     cluster.local_address = "127.0.0.1"
     assert true
   end
 
   def test_consistency
-    cluster = CassandraC::Cluster.new
+    cluster = CassandraC::Native::Cluster.new
 
     # Test with symbol
     cluster.consistency = :one
@@ -36,13 +36,13 @@ class TestCluster < Minitest::Test
   end
 
   def test_round_robin_load_balancing
-    cluster = CassandraC::Cluster.new
+    cluster = CassandraC::Native::Cluster.new
     cluster.use_round_robin_load_balancing
     assert true
   end
 
   def test_dc_aware_load_balancing
-    cluster = CassandraC::Cluster.new
+    cluster = CassandraC::Native::Cluster.new
 
     # Test with different datacenter names
     cluster.use_dc_aware_load_balancing("dc1")
@@ -53,7 +53,7 @@ class TestCluster < Minitest::Test
   end
 
   def test_dc_aware_load_balancing_invalid_params
-    cluster = CassandraC::Cluster.new
+    cluster = CassandraC::Native::Cluster.new
 
     # Test with invalid local_dc type
     assert_raises(TypeError) do

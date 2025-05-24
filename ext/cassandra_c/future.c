@@ -139,8 +139,8 @@ static VALUE future_tracing_id(VALUE self) {
 }
 
 // Initialize the Future class
-void Init_cassandra_c_future(VALUE mCassandraC) {
-    cCassFuture = rb_define_class_under(mCassandraC, "Future", rb_cObject);
+void Init_cassandra_c_future(VALUE module) {
+    cCassFuture = rb_define_class_under(module, "Future", rb_cObject);
     rb_define_alloc_func(cCassFuture, future_allocate);
     rb_define_method(cCassFuture, "ready?", future_ready, 0);
     rb_define_method(cCassFuture, "wait", future_wait, 0);
