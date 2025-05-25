@@ -65,7 +65,7 @@ session.query("CREATE TABLE codes (id int PRIMARY KEY, code ascii)")
 
 # Insert with UTF-8 content
 prepared = session.prepare("INSERT INTO messages (id, content) VALUES (?, ?)")
-statement = prepared.bind([1, "Hello, L! =€"])
+statement = prepared.bind([1, "Hello, L! =ï¿½"])
 session.execute(statement)
 
 # ASCII validation (will raise error for non-ASCII)
@@ -130,6 +130,67 @@ puts result.class       # => CassandraC::Types::TinyInt
 # Overflow handling (wraps around)
 overflow = 128.to_cassandra_tinyint  # => TinyInt(-128)
 puts overflow.to_i      # => -128
+```
+
+### Blob Types (Binary Data)
+
+```ruby
+# Create table with blob column for storing binary data
+session.query("CREATE TABLE files (id text PRIMARY KEY, filename text, data blob, file_type text)")
+
+# Store binary file data
+image_data = File.binread("example.png")  # Read binary file
+pdf_data = "\x25\x50\x44\x46\x2D\x31\x2E\x34".b  # PDF header
+
+# Insert blob data using type-specific binding
+prepared = session.prepare("INSERT INTO files (id, filename, data, file_type) VALUES (?, ?, ?, ?)")
+
+# Bind blob data by index
+statement = prepared.bind
+statement.bind_text_by_index(0, "file1")
+statement.bind_text_by_index(1, "example.png")
+statement.bind_blob_by_index(2, image_data)
+statement.bind_text_by_index(3, "image/png")
+session.execute(statement)
+
+# Bind blob data by name
+prepared_named = session.prepare("INSERT INTO files (id, filename, data, file_type) VALUES (:id, :filename, :data, :file_type)")
+statement = prepared_named.bind
+statement.bind_text_by_name("id", "file2")
+statement.bind_text_by_name("filename", "document.pdf")
+statement.bind_blob_by_name("data", pdf_data)
+statement.bind_text_by_name("file_type", "application/pdf")
+session.execute(statement)
+
+# Retrieve blob data (maintains binary encoding)
+result = session.query("SELECT filename, data FROM files WHERE id = 'file1'")
+row = result.to_a.first
+filename = row[0]
+file_data = row[1]
+
+puts "File: #{filename}"
+puts "Size: #{file_data.bytesize} bytes"
+puts "Encoding: #{file_data.encoding}"  # => ASCII-8BIT
+
+# Write retrieved data to file
+File.binwrite("retrieved_#{filename}", file_data)
+
+# Handle various binary data types
+binary_examples = [
+  "\x00\x01\x02\x03\xFF".b,              # Raw binary sequence
+  "Hello".force_encoding("ASCII-8BIT"),   # Text as binary
+  Random.bytes(1024),                      # Random binary data
+  "".b                                     # Empty binary data
+]
+
+binary_examples.each_with_index do |data, index|
+  statement = prepared.bind
+  statement.bind_text_by_index(0, "binary_#{index}")
+  statement.bind_text_by_index(1, "data_#{index}.bin")
+  statement.bind_blob_by_index(2, data)
+  statement.bind_text_by_index(3, "application/octet-stream")
+  session.execute(statement)
+end
 ```
 
 ### Boolean and Null Values

@@ -204,6 +204,35 @@ result = tiny1 + tiny2  # => TinyInt(150)
 overflow = 128.to_cassandra_tinyint  # => TinyInt(-128)
 ```
 
+### Blob Types Usage
+
+CassandraC supports blob (binary) data using Ruby strings with binary encoding:
+
+```ruby
+require 'cassandra_c'
+
+# Create session and table
+session.query("CREATE TABLE files (id text PRIMARY KEY, data blob)")
+
+# Store binary data as blob
+binary_data = "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR".b  # PNG header
+prepared = session.prepare("INSERT INTO files (id, data) VALUES (?, ?)")
+statement = prepared.bind
+statement.bind_text_by_index(0, "image1")
+statement.bind_blob_by_index(1, binary_data)
+session.execute(statement)
+
+# Can also bind by name
+statement = prepared.bind
+statement.bind_text_by_name("id", "image2")
+statement.bind_blob_by_name("data", binary_data)
+session.execute(statement)
+
+# Retrieved blob data maintains binary encoding
+result = session.query("SELECT data FROM files WHERE id = 'image1'")
+# Result data will have ASCII-8BIT encoding
+```
+
 ### Test Structure
 
 Tests are organized by namespace:
@@ -215,3 +244,29 @@ Tests are organized by namespace:
   - `test_retry_policy.rb` - Retry policy tests
   - `test_integer_types.rb` - Integer type functionality tests
   - `test_string_types.rb` - String type functionality tests
+  - `test_blob_types.rb` - Blob type functionality tests
+
+## Development Guidelines
+
+### Testing Environment
+- **Cassandra is assumed to be running** - Do not start/stop Cassandra containers in development
+- Always run the full test suite (`bundle exec rake test`) when completing features
+- Address all test failures before considering work complete
+- Run linter (`bundle exec rake standard`) and fix all issues
+
+### Code Patterns
+- **Study existing patterns first** - Always examine similar existing code before implementing
+- **Reuse setup/teardown patterns** - Use proper `setup` and `teardown` methods in tests, avoid duplication
+- **Follow file conventions** - End all files with newlines, avoid whitespace-only lines
+- **Type-specific binding** - Use dedicated binding methods like `bind_text_by_index`, `bind_blob_by_index`
+- **Memory management** - Use Ruby's typed data with `RUBY_TYPED_FREE_IMMEDIATELY` for C resources
+
+### Feature Completion Checklist
+When implementing a new feature:
+1. Research existing patterns in the codebase
+2. Implement following established conventions
+3. Create comprehensive tests following existing test structure
+4. Run full test suite and fix any failures
+5. Run linter and fix all style issues
+6. Update documentation in CLAUDE.md, EXAMPLES.md, and TODO.md
+7. Verify examples work correctly

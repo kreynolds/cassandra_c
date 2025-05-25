@@ -1,5 +1,6 @@
 #include "cassandra_c.h"
 #include <string.h>
+#include "ruby/encoding.h"
 
 // Ruby classes for integer types (will be looked up at runtime)
 static VALUE cTinyInt = Qnil;
@@ -302,6 +303,15 @@ VALUE cass_value_to_ruby(const CassValue* value) {
             rb_value = rb_str_new_cstr(uuid_str);
             break;
         }
+        case CASS_VALUE_TYPE_BLOB: {
+            const cass_byte_t* bytes;
+            size_t bytes_length;
+            cass_value_get_bytes(value, &bytes, &bytes_length);
+            rb_value = rb_str_new((const char*)bytes, bytes_length);
+            // Set encoding to ASCII-8BIT (binary) for blob data
+            rb_enc_associate(rb_value, rb_ascii8bit_encoding());
+            break;
+        }
         // Add other data types as needed
         default:
             rb_value = rb_str_new_cstr("[unsupported type]");
@@ -375,4 +385,33 @@ CassError ruby_string_to_cass_ascii_by_name(CassStatement* statement, const char
     }
     
     return cass_statement_bind_string_by_name_n(statement, name, strlen(name), str, len);
+}
+
+// Type-specific binding functions for blob (binary data)
+CassError ruby_string_to_cass_blob(CassStatement* statement, size_t index, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null(statement, index);
+    }
+    
+    Check_Type(rb_value, T_STRING);
+    
+    const char* data = RSTRING_PTR(rb_value);
+    size_t len = RSTRING_LEN(rb_value);
+    
+    // Blob accepts any binary data
+    return cass_statement_bind_bytes(statement, index, (const cass_byte_t*)data, len);
+}
+
+CassError ruby_string_to_cass_blob_by_name(CassStatement* statement, const char* name, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null_by_name(statement, name);
+    }
+    
+    Check_Type(rb_value, T_STRING);
+    
+    const char* data = RSTRING_PTR(rb_value);
+    size_t len = RSTRING_LEN(rb_value);
+    
+    // Blob accepts any binary data
+    return cass_statement_bind_bytes_by_name(statement, name, (const cass_byte_t*)data, len);
 }

@@ -79,7 +79,11 @@ This document outlines all features and improvements needed to make CassandraC a
     - [x] Arithmetic operations preserve types with overflow wrapping
   - [ ] Floating point types (float, double, decimal)
   - [ ] Boolean type
-  - [ ] Blob/binary data
+  - [x] **Blob/binary data** ✅ (Complete with proper binary encoding handling):
+    - [x] `bind_blob_by_index` and `bind_blob_by_name` methods
+    - [x] Binary data storage and retrieval with ASCII-8BIT encoding
+    - [x] Support for all binary data types (files, raw bytes, etc.)
+    - [x] Proper null and empty data handling
   - [ ] UUID and TimeUUID types
   - [ ] Date and time types (date, time, timestamp)
   - [ ] Inet type (IP addresses)
