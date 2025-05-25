@@ -78,7 +78,12 @@ This document outlines all features and improvements needed to make CassandraC a
     - [x] Proper parameter binding and result parsing in C extension
     - [x] Arithmetic operations preserve types with overflow wrapping
   - [ ] Floating point types (float, double, decimal)
-  - [ ] Boolean type
+  - [x] **Boolean type** ✅ (Complete with comprehensive test coverage):
+    - [x] True/false value binding by index and name
+    - [x] Array parameter binding with boolean values
+    - [x] Null value handling for boolean columns
+    - [x] Result parsing returns proper Ruby true/false/nil values
+    - [x] Integration with simple and prepared queries
   - [x] **Blob/binary data** ✅ (Complete with proper binary encoding handling):
     - [x] `bind_blob_by_index` and `bind_blob_by_name` methods
     - [x] Binary data storage and retrieval with ASCII-8BIT encoding

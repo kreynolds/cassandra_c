@@ -39,29 +39,57 @@ This document tracks the costs associated with using AI (Claude) to develop feat
 - `test/native/test_blob_types.rb` - Test suite
 - Updated documentation and development guidelines
 
+### Boolean Types Support
+**Cost**: $1.24  
+**Duration**: 12m 30s (wall time), 11m 15s (API time)  
+**Token Usage**: 89.2k input, 18.7k output  
+**Code Changes**: 198 lines added, 2 lines removed
+
+**Features Implemented**:
+- Boolean value binding by index and name (true/false/nil)
+- Array parameter binding with boolean values
+- Comprehensive result parsing for boolean columns
+- Integration with simple and prepared queries
+- Edge case handling and validation
+- Comprehensive test suite with 6 test cases
+- Centralized test setup pattern implementation
+
+**Key Deliverables**:
+- `test/native/test_boolean_types.rb` - Complete test suite
+- `test/test_helper.rb` - Centralized DDL setup pattern
+- Updated CLAUDE.md with DDL guidelines
+- Updated TODO.md marking boolean support complete
+
 ## Cost Analysis
 
 ### Total Project Costs
-- **Total Cost**: $6.38
-- **Total Features**: 2 major data type implementations
-- **Average Cost per Feature**: $3.19
+- **Total Cost**: $7.62
+- **Total Features**: 3 major data type implementations
+- **Average Cost per Feature**: $2.54
 
 ### Cost Observations
-1. **Blob types were significantly cheaper** ($1.67 vs $4.71) than integer types
-   - Likely due to following established patterns from integer implementation
-   - Demonstrates pattern reuse reducing implementation costs
+1. **Decreasing costs per feature** as patterns emerge:
+   - Integer types: $4.71 (baseline implementation)
+   - Blob types: $1.67 (65% cheaper, following established patterns)
+   - Boolean types: $1.24 (74% cheaper, leveraging existing C code)
 
-2. **Development velocity** for blob implementation
-   - ~24 minutes for complete feature implementation
-   - Includes: research, implementation, testing, documentation, debugging
-   - 384 lines of code = ~16 lines/minute
+2. **Development velocity improvements**:
+   - Boolean implementation: ~12 minutes (fastest yet)
+   - Demonstrates accelerating development as patterns solidify
+   - Most work was test creation and documentation updates
+
+3. **Pattern reuse benefits**:
+   - Boolean support already existed in C extension
+   - Main work was comprehensive testing and documentation
+   - Centralized test setup pattern reduces future maintenance
 
 ### Quality Metrics
-- ✅ All tests passing (47 total tests across project)
+- ✅ All tests passing (53 total tests across project)
 - ✅ Code follows existing patterns and conventions
 - ✅ Comprehensive documentation
 - ✅ Proper error handling and edge cases
 - ✅ Memory management best practices
+- ✅ Centralized test setup reduces duplication
 
 ## Future Cost Predictions
 
