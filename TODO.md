@@ -91,7 +91,14 @@ This document outlines all features and improvements needed to make CassandraC a
     - [x] Proper null and empty data handling
   - [ ] UUID and TimeUUID types
   - [ ] Date and time types (date, time, timestamp)
-  - [ ] Inet type (IP addresses)
+  - [x] **Inet type (IP addresses)** ✅ (Complete with comprehensive IPv4/IPv6 support):
+    - [x] `bind_inet_by_index` and `bind_inet_by_name` methods
+    - [x] Support for String and IPAddr object input
+    - [x] IPv4 and IPv6 address handling
+    - [x] Null value support
+    - [x] Result parsing returns IP addresses as strings
+    - [x] Edge case handling (localhost, compressed IPv6, etc.)
+    - [x] Proper validation and error handling for invalid IP addresses
   - [x] **Counter type** ✅ (Complete with comprehensive test coverage):
     - [x] Counter increment and decrement operations
     - [x] Prepared statement support with BigInt parameter binding

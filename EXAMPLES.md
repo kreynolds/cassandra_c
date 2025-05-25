@@ -281,6 +281,159 @@ result = counter1 + counter2  # => BigInt(150)
 puts result.class             # => CassandraC::Types::BigInt
 ```
 
+### Inet Types (IP Addresses)
+
+```ruby
+require 'ipaddr'
+
+# Create table with inet columns for storing IP addresses
+session.query(<<~SQL)
+  CREATE TABLE servers (
+    id text PRIMARY KEY,
+    primary_ip inet,
+    backup_ip inet,
+    gateway inet,
+    created_at timestamp
+  )
+SQL
+
+# Store IP addresses using string literals
+prepared = session.prepare("INSERT INTO servers (id, primary_ip, backup_ip, gateway) VALUES (?, ?, ?, ?)")
+
+# IPv4 addresses as strings
+statement = prepared.bind
+statement.bind_text_by_index(0, "web-server-1")
+statement.bind_inet_by_index(1, "192.168.1.100")      # Primary IP
+statement.bind_inet_by_index(2, "192.168.1.101")      # Backup IP  
+statement.bind_inet_by_index(3, "192.168.1.1")        # Gateway
+session.execute(statement)
+
+# IPv6 addresses as strings
+statement = prepared.bind
+statement.bind_text_by_index(0, "web-server-2")
+statement.bind_inet_by_index(1, "2001:db8::100")      # Primary IPv6
+statement.bind_inet_by_index(2, "2001:db8::101")      # Backup IPv6
+statement.bind_inet_by_index(3, "2001:db8::1")        # Gateway IPv6
+session.execute(statement)
+
+# Store IP addresses using IPAddr objects
+statement = prepared.bind
+statement.bind_text_by_index(0, "db-server-1")
+statement.bind_inet_by_index(1, IPAddr.new("10.0.0.50"))       # Primary IP object
+statement.bind_inet_by_index(2, IPAddr.new("10.0.0.51"))       # Backup IP object
+statement.bind_inet_by_index(3, IPAddr.new("10.0.0.1"))        # Gateway IP object
+session.execute(statement)
+
+# Mixed IPv4 and IPv6
+statement = prepared.bind
+statement.bind_text_by_index(0, "mixed-server")
+statement.bind_inet_by_index(1, "172.16.0.100")               # IPv4 string
+statement.bind_inet_by_index(2, IPAddr.new("fe80::1"))        # IPv6 object
+statement.bind_inet_by_index(3, "127.0.0.1")                  # Localhost IPv4
+session.execute(statement)
+
+# Bind by name instead of index
+prepared_named = session.prepare("INSERT INTO servers (id, primary_ip, backup_ip, gateway) VALUES (:server_id, :primary, :backup, :gw)")
+statement = prepared_named.bind
+statement.bind_text_by_name("server_id", "app-server-1")
+statement.bind_inet_by_name("primary", "192.168.100.10")
+statement.bind_inet_by_name("backup", IPAddr.new("192.168.100.11"))
+statement.bind_inet_by_name("gw", "192.168.100.1")
+session.execute(statement)
+
+# Handle null values
+statement = prepared.bind
+statement.bind_text_by_index(0, "no-backup-server")
+statement.bind_inet_by_index(1, "192.168.200.10")      # Primary IP
+statement.bind_inet_by_index(2, nil)                    # No backup IP
+statement.bind_inet_by_index(3, "192.168.200.1")       # Gateway
+session.execute(statement)
+
+# Query inet data (returns as strings)
+result = session.query("SELECT id, primary_ip, backup_ip, gateway FROM servers WHERE id = 'web-server-1'")
+row = result.to_a.first
+
+server_id = row[0]      # => "web-server-1"
+primary_ip = row[1]     # => "192.168.1.100" (String)
+backup_ip = row[2]      # => "192.168.1.101" (String)  
+gateway = row[3]        # => "192.168.1.1" (String)
+
+puts "Server: #{server_id}"
+puts "Primary IP: #{primary_ip} (#{primary_ip.class})"
+puts "Backup IP: #{backup_ip}"
+puts "Gateway: #{gateway}"
+
+# Convert results to IPAddr objects for network operations
+primary_addr = IPAddr.new(primary_ip)
+backup_addr = IPAddr.new(backup_ip)
+gateway_addr = IPAddr.new(gateway)
+
+# Perform network calculations
+puts "Primary is IPv4: #{primary_addr.ipv4?}"
+puts "Primary is IPv6: #{primary_addr.ipv6?}"
+puts "Primary in same subnet as backup: #{primary_addr.mask(24) == backup_addr.mask(24)}"
+
+# Query all servers and group by IP version
+result = session.query("SELECT id, primary_ip FROM servers")
+ipv4_servers = []
+ipv6_servers = []
+
+result.each do |row|
+  server_id = row[0]
+  ip_string = row[1]
+  
+  next if ip_string.nil?  # Skip servers with null IPs
+  
+  ip_addr = IPAddr.new(ip_string)
+  if ip_addr.ipv4?
+    ipv4_servers << {id: server_id, ip: ip_string}
+  else
+    ipv6_servers << {id: server_id, ip: ip_string}
+  end
+end
+
+puts "\nIPv4 Servers:"
+ipv4_servers.each { |server| puts "  #{server[:id]}: #{server[:ip]}" }
+
+puts "\nIPv6 Servers:"  
+ipv6_servers.each { |server| puts "  #{server[:id]}: #{server[:ip]}" }
+
+# Special IPv6 formats and edge cases
+special_cases = [
+  ["localhost-ipv6", "::1"],                                    # IPv6 localhost
+  ["any-address", "::"],                                        # IPv6 any address
+  ["mapped-ipv4", "::ffff:192.0.2.1"],                        # IPv4-mapped IPv6
+  ["full-ipv6", "2001:0db8:85a3:0000:0000:8a2e:0370:7334"],   # Full IPv6 notation
+  ["compressed", "2001:db8:85a3::8a2e:370:7334"]              # Compressed IPv6
+]
+
+special_cases.each do |server_id, ip_address|
+  statement = prepared.bind
+  statement.bind_text_by_index(0, server_id)
+  statement.bind_inet_by_index(1, ip_address)
+  statement.bind_inet_by_index(2, nil)  # No backup
+  statement.bind_inet_by_index(3, nil)  # No gateway
+  session.execute(statement)
+  
+  puts "Stored #{server_id}: #{ip_address}"
+end
+
+# Query and validate special cases
+special_cases.each do |server_id, original_ip|
+  result = session.query("SELECT primary_ip FROM servers WHERE id = '#{server_id}'")
+  row = result.to_a.first
+  stored_ip = row[0]
+  
+  # Note: Cassandra may normalize IPv6 addresses
+  puts "#{server_id}: #{original_ip} -> #{stored_ip}"
+  
+  # Verify they represent the same address
+  original_addr = IPAddr.new(original_ip)
+  stored_addr = IPAddr.new(stored_ip)
+  puts "  Addresses equal: #{original_addr == stored_addr}"
+end
+```
+
 ## Advanced Usage
 
 ### Async Operations

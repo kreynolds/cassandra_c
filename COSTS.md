@@ -85,14 +85,39 @@ This document tracks the costs associated with using AI (Claude) to develop feat
 - Updated TODO.md marking counter support complete
 - Updated EXAMPLES.md with comprehensive counter usage examples
 
+### Inet Types Support
+**Cost**: $1.15  
+**Duration**: 11m 25s (wall time), 10m 10s (API time)  
+**Token Usage**: 78.6k input, 16.8k output  
+**Code Changes**: 287 lines added, 0 lines removed
+
+**Features Implemented**:
+- IP address storage and retrieval (IPv4 and IPv6)
+- `bind_inet_by_index` and `bind_inet_by_name` methods
+- Support for both String and IPAddr object input
+- Proper IP address validation with error handling
+- Null value support for inet columns
+- Result parsing returns IP addresses as strings
+- Edge case handling (localhost, compressed IPv6, IPv4-mapped IPv6)
+- Comprehensive test suite with 11 test cases
+- Helper function pattern to eliminate code duplication
+
+**Key Deliverables**:
+- `ext/cassandra_c/value.c` - Inet conversion and binding functions
+- `ext/cassandra_c/statement.c` - Statement binding methods  
+- `ext/cassandra_c/cassandra_c.h` - Function declarations
+- `test/native/test_inet_types.rb` - Complete test suite
+- `test/test_helper.rb` - Added inet table DDL
+- Updated CLAUDE.md, EXAMPLES.md, TODO.md with comprehensive inet documentation
+
 ## Cost Analysis
 
 ### Total Project Costs
-- **Feature Development Cost**: $8.51
+- **Feature Development Cost**: $9.66
 - **Escape Resolution Cost**: $0.15 (see ESCAPES.md)
-- **Total Project Cost**: $8.66
-- **Total Features**: 4 major data type implementations
-- **Average Cost per Feature**: $2.13
+- **Total Project Cost**: $9.81
+- **Total Features**: 5 major data type implementations
+- **Average Cost per Feature**: $1.93
 
 ### Cost Observations
 1. **Decreasing costs per feature** as patterns emerge:
@@ -100,29 +125,33 @@ This document tracks the costs associated with using AI (Claude) to develop feat
    - Blob types: $1.67 (65% cheaper, following established patterns)
    - Boolean types: $1.24 (74% cheaper, leveraging existing C code)
    - Counter types: $0.89 (81% cheaper, leveraging BigInt type and existing patterns)
+   - Inet types: $1.15 (76% cheaper, following established patterns with helper function optimization)
 
 2. **Development velocity improvements**:
-   - Counter implementation: ~8 minutes (fastest yet)
+   - Counter implementation: ~8 minutes (fastest implementation)
+   - Inet implementation: ~11 minutes (still very fast)
    - Demonstrates accelerating development as patterns solidify
-   - Most work was test creation and documentation updates
-   - Leveraged existing BigInt type support entirely
+   - Most work is now test creation and documentation updates
+   - Helper function patterns reduce code duplication
 
 3. **Pattern reuse benefits**:
-   - Counter support already existed in C extension (mapped to BIGINT)
-   - Main work was comprehensive testing and documentation
+   - Established C extension patterns for binding and result extraction
+   - Helper function approach reduces code duplication (inet implementation)
    - Centralized test setup pattern greatly reduces development time
    - DDL guidelines prevent common mistakes
+   - Type-specific binding method patterns now well-established
 
 ### Quality Metrics
-- ✅ All tests passing (62 total tests across project)
+- ✅ All tests passing (73 total tests across project)
 - ✅ Code follows existing patterns and conventions
-- ✅ Comprehensive documentation
+- ✅ Comprehensive documentation across all features
 - ✅ Proper error handling and edge cases
 - ✅ Memory management best practices
 - ✅ Centralized test setup reduces duplication
-- ✅ Counter operations work with batch statements
-- ✅ Large value support near int64 limits
-- ✅ Low escape rate: 1 escape across 4 features (1.7% cost overhead)
+- ✅ IPv4 and IPv6 support with proper validation
+- ✅ Helper function patterns eliminate code duplication
+- ✅ Integration with Ruby's IPAddr class
+- ✅ Low escape rate: 1 escape across 5 features (1.5% cost overhead)
 
 ## Future Cost Predictions
 

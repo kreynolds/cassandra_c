@@ -233,6 +233,50 @@ result = session.query("SELECT data FROM files WHERE id = 'image1'")
 # Result data will have ASCII-8BIT encoding
 ```
 
+### Inet Types Usage
+
+CassandraC supports inet (IP address) data using either Ruby strings or IPAddr objects:
+
+```ruby
+require 'cassandra_c'
+require 'ipaddr'
+
+# Create session and table
+session.query("CREATE TABLE servers (id text PRIMARY KEY, ip_address inet, backup_ip inet)")
+
+# Store IP addresses using strings
+prepared = session.prepare("INSERT INTO servers (id, ip_address, backup_ip) VALUES (?, ?, ?)")
+statement = prepared.bind
+statement.bind_text_by_index(0, "server1")
+statement.bind_inet_by_index(1, "192.168.1.100")      # IPv4 string
+statement.bind_inet_by_index(2, "2001:db8::1")        # IPv6 string
+session.execute(statement)
+
+# Store IP addresses using IPAddr objects
+statement = prepared.bind
+statement.bind_text_by_index(0, "server2")
+statement.bind_inet_by_index(1, IPAddr.new("10.0.0.1"))           # IPv4 IPAddr
+statement.bind_inet_by_index(2, IPAddr.new("fe80::1"))             # IPv6 IPAddr
+session.execute(statement)
+
+# Can also bind by name
+statement = prepared.bind
+statement.bind_text_by_name("id", "server3")
+statement.bind_inet_by_name("ip_address", "172.16.0.1")
+statement.bind_inet_by_name("backup_ip", IPAddr.new("::1"))
+session.execute(statement)
+
+# Retrieved inet data returns as strings
+result = session.query("SELECT ip_address, backup_ip FROM servers WHERE id = 'server1'")
+row = result.to_a.first
+row[0]  # => "192.168.1.100" (String)
+row[1]  # => "2001:db8::1" (String)
+
+# Convert back to IPAddr if needed
+primary_ip = IPAddr.new(row[0])
+backup_ip = IPAddr.new(row[1])
+```
+
 ### Test Structure
 
 Tests are organized by namespace:
@@ -246,6 +290,7 @@ Tests are organized by namespace:
   - `test_string_types.rb` - String type functionality tests
   - `test_blob_types.rb` - Blob type functionality tests
   - `test_boolean_types.rb` - Boolean type functionality tests
+  - `test_inet_types.rb` - Inet type functionality tests
 
 ## Development Guidelines
 
@@ -260,7 +305,7 @@ Tests are organized by namespace:
 - **Reuse setup/teardown patterns** - Use proper `setup` and `teardown` methods in tests, avoid duplication
 - **DDL in test_helper ONLY** - ALL table creation DDL must be in `test/test_helper.rb` global setup, NEVER in individual test files or class setup methods. Individual tests should only connect to existing tables.
 - **Follow file conventions** - End all files with newlines, avoid whitespace-only lines
-- **Type-specific binding** - Use dedicated binding methods like `bind_text_by_index`, `bind_blob_by_index`
+- **Type-specific binding** - Use dedicated binding methods like `bind_text_by_index`, `bind_blob_by_index`, `bind_inet_by_index`
 - **Memory management** - Use Ruby's typed data with `RUBY_TYPED_FREE_IMMEDIATELY` for C resources
 
 ### Feature Completion Checklist

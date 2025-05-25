@@ -34,6 +34,7 @@ module TestEnvironment
     # Counter tables require special structure - all non-counter columns must be primary key
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.counter_table (id text, category text, page_views counter, unique_visitors counter, PRIMARY KEY (id, category))")
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.single_counter (id text PRIMARY KEY, count counter)")
+    session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.inet_types (id text PRIMARY KEY, ip_address inet, server_ip inet)")
 
     session.close
     @@setup_complete = true

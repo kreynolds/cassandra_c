@@ -312,6 +312,14 @@ VALUE cass_value_to_ruby(const CassValue* value) {
             rb_enc_associate(rb_value, rb_ascii8bit_encoding());
             break;
         }
+        case CASS_VALUE_TYPE_INET: {
+            CassInet inet;
+            cass_value_get_inet(value, &inet);
+            char inet_str[CASS_INET_STRING_LENGTH];
+            cass_inet_string(inet, inet_str);
+            rb_value = rb_str_new_cstr(inet_str);
+            break;
+        }
         // Add other data types as needed
         default:
             rb_value = rb_str_new_cstr("[unsupported type]");
@@ -414,4 +422,61 @@ CassError ruby_string_to_cass_blob_by_name(CassStatement* statement, const char*
     
     // Blob accepts any binary data
     return cass_statement_bind_bytes_by_name(statement, name, (const cass_byte_t*)data, len);
+}
+
+// Helper function to convert Ruby value to CassInet
+static CassError ruby_value_to_cass_inet_value(VALUE rb_value, CassInet* inet) {
+    const char* ip_str;
+    VALUE str_value;
+    
+    // Handle different input types
+    if (TYPE(rb_value) == T_STRING) {
+        // Direct string input
+        str_value = rb_value;
+        ip_str = RSTRING_PTR(str_value);
+    } else {
+        // Check if it's an IPAddr object
+        VALUE ipaddr_class = rb_const_get(rb_cObject, rb_intern("IPAddr"));
+        if (rb_obj_is_kind_of(rb_value, ipaddr_class)) {
+            // Convert IPAddr to string
+            str_value = rb_funcall(rb_value, rb_intern("to_s"), 0);
+            ip_str = RSTRING_PTR(str_value);
+        } else {
+            // Try to convert to string as fallback
+            str_value = rb_obj_as_string(rb_value);
+            ip_str = RSTRING_PTR(str_value);
+        }
+    }
+    
+    // Parse the IP address string into CassInet
+    return cass_inet_from_string(ip_str, inet);
+}
+
+// Type-specific binding functions for inet (IP addresses)
+CassError ruby_value_to_cass_inet(CassStatement* statement, size_t index, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null(statement, index);
+    }
+    
+    CassInet inet;
+    CassError error = ruby_value_to_cass_inet_value(rb_value, &inet);
+    if (error != CASS_OK) {
+        return error;
+    }
+    
+    return cass_statement_bind_inet(statement, index, inet);
+}
+
+CassError ruby_value_to_cass_inet_by_name(CassStatement* statement, const char* name, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null_by_name(statement, name);
+    }
+    
+    CassInet inet;
+    CassError error = ruby_value_to_cass_inet_value(rb_value, &inet);
+    if (error != CASS_OK) {
+        return error;
+    }
+    
+    return cass_statement_bind_inet_by_name(statement, name, inet);
 }
