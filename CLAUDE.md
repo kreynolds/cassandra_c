@@ -318,4 +318,7 @@ When implementing a new feature:
 6. Update documentation in CLAUDE.md, EXAMPLES.md, and TODO.md
 7. Verify examples work correctly
 8. Update COSTS.md with development cost and feature details
-9. If bugs are discovered post-implementation, track them in ESCAPES.md
+9. Create git commit with proper message format
+10. If bugs are discovered post-implementation, track them in ESCAPES.md
+
+**IMPORTANT**: A feature is not considered complete until all documentation is updated AND a git commit has been made. The commit should include all code changes and documentation updates together.
