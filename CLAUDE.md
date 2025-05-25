@@ -258,7 +258,7 @@ Tests are organized by namespace:
 ### Code Patterns
 - **Study existing patterns first** - Always examine similar existing code before implementing
 - **Reuse setup/teardown patterns** - Use proper `setup` and `teardown` methods in tests, avoid duplication
-- **DDL in test setup** - Create tables and keyspaces only once in class-level setup using `@@` variables, never in individual tests
+- **DDL in test_helper ONLY** - ALL table creation DDL must be in `test/test_helper.rb` global setup, NEVER in individual test files or class setup methods. Individual tests should only connect to existing tables.
 - **Follow file conventions** - End all files with newlines, avoid whitespace-only lines
 - **Type-specific binding** - Use dedicated binding methods like `bind_text_by_index`, `bind_blob_by_index`
 - **Memory management** - Use Ruby's typed data with `RUBY_TYPED_FREE_IMMEDIATELY` for C resources

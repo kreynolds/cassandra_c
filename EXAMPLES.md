@@ -215,6 +215,72 @@ statement = prepared.bind([3, nil, nil])
 session.execute(statement)
 ```
 
+### Counter Types
+
+```ruby
+# Counter tables require special structure - all non-counter columns must be primary key
+session.query(<<~SQL)
+  CREATE TABLE page_analytics (
+    page_id text,
+    category text,
+    page_views counter,
+    unique_visitors counter,
+    PRIMARY KEY (page_id, category)
+  )
+SQL
+
+# Single counter table
+session.query("CREATE TABLE stats (id text PRIMARY KEY, count counter)")
+
+# Increment counters using UPDATE statements
+session.query("UPDATE page_analytics SET page_views = page_views + 100, unique_visitors = unique_visitors + 10 WHERE page_id = 'home' AND category = 'tech'")
+
+# Increment single counter
+session.query("UPDATE stats SET count = count + 1 WHERE id = 'total_visits'")
+
+# Decrement counters (negative increment)
+session.query("UPDATE stats SET count = count - 5 WHERE id = 'total_visits'")
+
+# Use prepared statements with counters (counters map to BigInt type)
+prepared = session.prepare("UPDATE stats SET count = count + ? WHERE id = ?")
+
+# Increment by a large value
+increment_val = 42.to_cassandra_bigint
+statement = prepared.bind([increment_val, "user_actions"])
+session.execute(statement)
+
+# Decrement with negative value
+decrement_val = (-10).to_cassandra_bigint
+statement = prepared.bind([decrement_val, "user_actions"])
+session.execute(statement)
+
+# Query counter values (returns BigInt type)
+result = session.query("SELECT count FROM stats WHERE id = 'total_visits'")
+row = result.to_a.first
+counter_value = row[0]
+
+puts counter_value.class  # => CassandraC::Types::BigInt
+puts counter_value.to_i   # => Current counter value
+
+# Batch counter operations (requires COUNTER BATCH)
+session.query(<<~SQL)
+  BEGIN COUNTER BATCH
+    UPDATE stats SET count = count + 1 WHERE id = 'batch_test1';
+    UPDATE stats SET count = count + 2 WHERE id = 'batch_test2';
+  APPLY BATCH
+SQL
+
+# Large counter values (near int64 limits)
+large_val = 9223372036854775000.to_cassandra_bigint
+session.query("UPDATE stats SET count = count + #{large_val.to_i} WHERE id = 'large_counter'")
+
+# Counter arithmetic preserves BigInt type
+counter1 = 100.to_cassandra_bigint
+counter2 = 50.to_cassandra_bigint
+result = counter1 + counter2  # => BigInt(150)
+puts result.class             # => CassandraC::Types::BigInt
+```
+
 ## Advanced Usage
 
 ### Async Operations

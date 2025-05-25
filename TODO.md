@@ -92,7 +92,15 @@ This document outlines all features and improvements needed to make CassandraC a
   - [ ] UUID and TimeUUID types
   - [ ] Date and time types (date, time, timestamp)
   - [ ] Inet type (IP addresses)
-  - [ ] Counter type
+  - [x] **Counter type** ✅ (Complete with comprehensive test coverage):
+    - [x] Counter increment and decrement operations
+    - [x] Prepared statement support with BigInt parameter binding
+    - [x] Multiple counter columns per table
+    - [x] Batch counter operations (COUNTER BATCH statements)
+    - [x] Large value handling (near int64 limits)
+    - [x] Zero and negative counter values
+    - [x] Type preservation (counters map to BigInt type)
+    - [x] Proper counter table schema requirements (non-counter columns in primary key)
   - [ ] Duration type
 - [ ] **Collection Types**:
   - [ ] List collections
