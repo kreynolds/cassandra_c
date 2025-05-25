@@ -270,3 +270,4 @@ When implementing a new feature:
 5. Run linter and fix all style issues
 6. Update documentation in CLAUDE.md, EXAMPLES.md, and TODO.md
 7. Verify examples work correctly
+8. Update COSTS.md with development cost and feature details
