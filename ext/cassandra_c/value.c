@@ -1,6 +1,26 @@
 #include "cassandra_c.h"
 #include <string.h>
 
+// Ruby classes for integer types (will be looked up at runtime)
+static VALUE cTinyInt = Qnil;
+static VALUE cSmallInt = Qnil;
+static VALUE cInt = Qnil;
+static VALUE cBigInt = Qnil;
+static VALUE cVarInt = Qnil;
+
+// Helper function to initialize type class references
+static void init_type_classes() {
+    if (cTinyInt == Qnil) {
+        VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
+        VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
+        cTinyInt = rb_const_get(mTypes, rb_intern("TinyInt"));
+        cSmallInt = rb_const_get(mTypes, rb_intern("SmallInt"));
+        cInt = rb_const_get(mTypes, rb_intern("Int"));
+        cBigInt = rb_const_get(mTypes, rb_intern("BigInt"));
+        cVarInt = rb_const_get(mTypes, rb_intern("VarInt"));
+    }
+}
+
 // Helper function to validate that a string contains only ASCII characters
 static int is_ascii_string(const char* str, size_t len) {
     for (size_t i = 0; i < len; i++) {
@@ -31,6 +51,69 @@ CassError ruby_value_to_cass_statement(CassStatement* statement, size_t index, V
             return cass_statement_bind_bool(statement, index, cass_true);
         case T_FALSE:
             return cass_statement_bind_bool(statement, index, cass_false);
+        case T_FIXNUM:
+        case T_BIGNUM: {
+            init_type_classes();
+            VALUE rb_class = rb_obj_class(rb_value);
+            
+            if (rb_class == cTinyInt) {
+                cass_int8_t val = (cass_int8_t)NUM2INT(rb_value);
+                return cass_statement_bind_int8(statement, index, val);
+            } else if (rb_class == cSmallInt) {
+                cass_int16_t val = (cass_int16_t)NUM2INT(rb_value);
+                return cass_statement_bind_int16(statement, index, val);
+            } else if (rb_class == cInt) {
+                cass_int32_t val = (cass_int32_t)NUM2LONG(rb_value);
+                return cass_statement_bind_int32(statement, index, val);
+            } else if (rb_class == cBigInt) {
+                cass_int64_t val = (cass_int64_t)NUM2LL(rb_value);
+                return cass_statement_bind_int64(statement, index, val);
+            } else if (rb_class == cVarInt) {
+                // Convert to string for VARINT
+                VALUE str_val = rb_funcall(rb_value, rb_intern("to_s"), 0);
+                const char* str = RSTRING_PTR(str_val);
+                size_t len = RSTRING_LEN(str_val);
+                return cass_statement_bind_string_n(statement, index, str, len);
+            } else {
+                // Default integer handling - use int32 for small values, int64 for large
+                if (TYPE(rb_value) == T_FIXNUM) {
+                    cass_int32_t val = (cass_int32_t)NUM2LONG(rb_value);
+                    return cass_statement_bind_int32(statement, index, val);
+                } else {
+                    cass_int64_t val = (cass_int64_t)NUM2LL(rb_value);
+                    return cass_statement_bind_int64(statement, index, val);
+                }
+            }
+        }
+        case T_OBJECT: {
+            // Check if it's a typed integer
+            if (rb_respond_to(rb_value, rb_intern("cassandra_typed_integer?"))) {
+                init_type_classes();
+                VALUE rb_class = rb_obj_class(rb_value);
+                VALUE int_val = rb_funcall(rb_value, rb_intern("to_i"), 0);
+                
+                if (rb_class == cTinyInt) {
+                    cass_int8_t val = (cass_int8_t)NUM2INT(int_val);
+                    return cass_statement_bind_int8(statement, index, val);
+                } else if (rb_class == cSmallInt) {
+                    cass_int16_t val = (cass_int16_t)NUM2INT(int_val);
+                    return cass_statement_bind_int16(statement, index, val);
+                } else if (rb_class == cInt) {
+                    cass_int32_t val = (cass_int32_t)NUM2LONG(int_val);
+                    return cass_statement_bind_int32(statement, index, val);
+                } else if (rb_class == cBigInt) {
+                    cass_int64_t val = (cass_int64_t)NUM2LL(int_val);
+                    return cass_statement_bind_int64(statement, index, val);
+                } else if (rb_class == cVarInt) {
+                    // Convert to string for VARINT
+                    VALUE str_val = rb_funcall(rb_value, rb_intern("to_s"), 0);
+                    const char* str = RSTRING_PTR(str_val);
+                    size_t len = RSTRING_LEN(str_val);
+                    return cass_statement_bind_string_n(statement, index, str, len);
+                }
+            }
+            // Fall through to default case for other objects
+        }
         default: {
             // Try to convert to string as fallback
             VALUE str_val = rb_obj_as_string(rb_value);
@@ -61,6 +144,69 @@ CassError ruby_value_to_cass_statement_by_name(CassStatement* statement, const c
             return cass_statement_bind_bool_by_name(statement, name, cass_true);
         case T_FALSE:
             return cass_statement_bind_bool_by_name(statement, name, cass_false);
+        case T_FIXNUM:
+        case T_BIGNUM: {
+            init_type_classes();
+            VALUE rb_class = rb_obj_class(rb_value);
+            
+            if (rb_class == cTinyInt) {
+                cass_int8_t val = (cass_int8_t)NUM2INT(rb_value);
+                return cass_statement_bind_int8_by_name(statement, name, val);
+            } else if (rb_class == cSmallInt) {
+                cass_int16_t val = (cass_int16_t)NUM2INT(rb_value);
+                return cass_statement_bind_int16_by_name(statement, name, val);
+            } else if (rb_class == cInt) {
+                cass_int32_t val = (cass_int32_t)NUM2LONG(rb_value);
+                return cass_statement_bind_int32_by_name(statement, name, val);
+            } else if (rb_class == cBigInt) {
+                cass_int64_t val = (cass_int64_t)NUM2LL(rb_value);
+                return cass_statement_bind_int64_by_name(statement, name, val);
+            } else if (rb_class == cVarInt) {
+                // Convert to string for VARINT
+                VALUE str_val = rb_funcall(rb_value, rb_intern("to_s"), 0);
+                const char* str = RSTRING_PTR(str_val);
+                size_t len = RSTRING_LEN(str_val);
+                return cass_statement_bind_string_by_name_n(statement, name, strlen(name), str, len);
+            } else {
+                // Default integer handling - use int32 for small values, int64 for large
+                if (TYPE(rb_value) == T_FIXNUM) {
+                    cass_int32_t val = (cass_int32_t)NUM2LONG(rb_value);
+                    return cass_statement_bind_int32_by_name(statement, name, val);
+                } else {
+                    cass_int64_t val = (cass_int64_t)NUM2LL(rb_value);
+                    return cass_statement_bind_int64_by_name(statement, name, val);
+                }
+            }
+        }
+        case T_OBJECT: {
+            // Check if it's a typed integer
+            if (rb_respond_to(rb_value, rb_intern("cassandra_typed_integer?"))) {
+                init_type_classes();
+                VALUE rb_class = rb_obj_class(rb_value);
+                VALUE int_val = rb_funcall(rb_value, rb_intern("to_i"), 0);
+                
+                if (rb_class == cTinyInt) {
+                    cass_int8_t val = (cass_int8_t)NUM2INT(int_val);
+                    return cass_statement_bind_int8_by_name(statement, name, val);
+                } else if (rb_class == cSmallInt) {
+                    cass_int16_t val = (cass_int16_t)NUM2INT(int_val);
+                    return cass_statement_bind_int16_by_name(statement, name, val);
+                } else if (rb_class == cInt) {
+                    cass_int32_t val = (cass_int32_t)NUM2LONG(int_val);
+                    return cass_statement_bind_int32_by_name(statement, name, val);
+                } else if (rb_class == cBigInt) {
+                    cass_int64_t val = (cass_int64_t)NUM2LL(int_val);
+                    return cass_statement_bind_int64_by_name(statement, name, val);
+                } else if (rb_class == cVarInt) {
+                    // Convert to string for VARINT
+                    VALUE str_val = rb_funcall(rb_value, rb_intern("to_s"), 0);
+                    const char* str = RSTRING_PTR(str_val);
+                    size_t len = RSTRING_LEN(str_val);
+                    return cass_statement_bind_string_by_name_n(statement, name, strlen(name), str, len);
+                }
+            }
+            // Fall through to default case for other objects
+        }
         default: {
             // Try to convert to string as fallback
             VALUE str_val = rb_obj_as_string(rb_value);
@@ -90,17 +236,44 @@ VALUE cass_value_to_ruby(const CassValue* value) {
             rb_value = rb_str_new(text, text_length);
             break;
         }
+        case CASS_VALUE_TYPE_TINY_INT: {
+            cass_int8_t i8;
+            cass_value_get_int8(value, &i8);
+            init_type_classes();
+            rb_value = rb_funcall(cTinyInt, rb_intern("new"), 1, INT2NUM(i8));
+            break;
+        }
+        case CASS_VALUE_TYPE_SMALL_INT: {
+            cass_int16_t i16;
+            cass_value_get_int16(value, &i16);
+            init_type_classes();
+            rb_value = rb_funcall(cSmallInt, rb_intern("new"), 1, INT2NUM(i16));
+            break;
+        }
         case CASS_VALUE_TYPE_INT: {
             cass_int32_t i32;
             cass_value_get_int32(value, &i32);
-            rb_value = INT2NUM(i32);
+            init_type_classes();
+            rb_value = rb_funcall(cInt, rb_intern("new"), 1, LONG2NUM(i32));
             break;
         }
         case CASS_VALUE_TYPE_BIGINT:
         case CASS_VALUE_TYPE_COUNTER: {
             cass_int64_t i64;
             cass_value_get_int64(value, &i64);
-            rb_value = LL2NUM(i64);
+            init_type_classes();
+            rb_value = rb_funcall(cBigInt, rb_intern("new"), 1, LL2NUM(i64));
+            break;
+        }
+        case CASS_VALUE_TYPE_VARINT: {
+            // VARINT values can be retrieved as string for simplicity
+            const char* text;
+            size_t text_length;
+            cass_value_get_string(value, &text, &text_length);
+            VALUE str_val = rb_str_new(text, text_length);
+            VALUE int_val = rb_funcall(str_val, rb_intern("to_i"), 0);
+            init_type_classes();
+            rb_value = rb_funcall(cVarInt, rb_intern("new"), 1, int_val);
             break;
         }
         case CASS_VALUE_TYPE_BOOLEAN: {

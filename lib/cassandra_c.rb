@@ -2,6 +2,7 @@
 
 require_relative "cassandra_c/version"
 require_relative "cassandra_c/cassandra_c"
+require_relative "cassandra_c/types"
 
 module CassandraC
   # Native module contains the low-level C++ driver bindings

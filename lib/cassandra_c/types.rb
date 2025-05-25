@@ -1,0 +1,164 @@
+module CassandraC
+  module Types
+    # Abstract base class for fixed-width signed integers
+    class FixedWidthInteger
+      def initialize(value)
+        unless value.is_a?(Integer)
+          raise ArgumentError, "Value must be an integer, got #{value.class}"
+        end
+        @value = self.class.normalize(value)
+      end
+
+      # Normalize value to the bit-size range using modulo for overflow
+      def self.normalize(num)
+        num = num % (1 << self::BIT_SIZE)
+        num -= (1 << self::BIT_SIZE) if num >= (1 << (self::BIT_SIZE - 1))
+        num
+      end
+
+      # Return the underlying Integer value
+      def to_i
+        @value
+      end
+
+      # Delegate most methods to the wrapped integer
+      def method_missing(method, *args, &block)
+        result = @value.send(method, *args, &block)
+        if result.is_a?(Integer) && ![:==, :<=>, :<, :<=, :>, :>=, :eql?, :hash].include?(method)
+          self.class.new(result)
+        else
+          result
+        end
+      end
+
+      def respond_to_missing?(method, include_private = false)
+        @value.respond_to?(method, include_private) || super
+      end
+
+      def ==(other)
+        @value == (other.is_a?(FixedWidthInteger) ? other.to_i : other)
+      end
+
+      def <=>(other)
+        @value <=> (other.is_a?(FixedWidthInteger) ? other.to_i : other)
+      end
+
+      def inspect
+        "#{self.class.name.split('::').last}(#{@value})"
+      end
+
+      def coerce(other)
+        [other, @value]
+      end
+
+      # Marker method to identify as a typed integer
+      def cassandra_typed_integer?
+        true
+      end
+
+    end
+
+    # 8-bit signed integer (-128 to 127) - Cassandra TINYINT
+    class TinyInt < FixedWidthInteger
+      BIT_SIZE = 8
+      MIN_VALUE = -128
+      MAX_VALUE = 127
+    end
+
+    # 16-bit signed integer (-32,768 to 32,767) - Cassandra SMALLINT
+    class SmallInt < FixedWidthInteger
+      BIT_SIZE = 16
+      MIN_VALUE = -32768
+      MAX_VALUE = 32767
+    end
+
+    # 32-bit signed integer (-2,147,483,648 to 2,147,483,647) - Cassandra INT
+    class Int < FixedWidthInteger
+      BIT_SIZE = 32
+      MIN_VALUE = -2147483648
+      MAX_VALUE = 2147483647
+    end
+
+    # 64-bit signed integer - Cassandra BIGINT
+    class BigInt < FixedWidthInteger
+      BIT_SIZE = 64
+      MIN_VALUE = -9223372036854775808
+      MAX_VALUE = 9223372036854775807
+    end
+
+    # Variable-length integer - Cassandra VARINT (no size limit)
+    class VarInt
+      def initialize(value)
+        unless value.is_a?(Integer)
+          raise ArgumentError, "Value must be an integer, got #{value.class}"
+        end
+        @value = value
+      end
+
+      def to_i
+        @value
+      end
+
+      def to_s
+        @value.to_s
+      end
+
+      def inspect
+        "VarInt(#{@value})"
+      end
+
+      def method_missing(method, *args, &block)
+        result = @value.send(method, *args, &block)
+        if result.is_a?(Integer) && ![:==, :<=>, :<, :<=, :>, :>=, :eql?, :hash].include?(method)
+          self.class.new(result)
+        else
+          result
+        end
+      end
+
+      def respond_to_missing?(method, include_private = false)
+        @value.respond_to?(method, include_private) || super
+      end
+
+      def ==(other)
+        @value == (other.is_a?(VarInt) ? other.to_i : other)
+      end
+
+      def <=>(other)
+        @value <=> (other.is_a?(VarInt) ? other.to_i : other)
+      end
+
+      def coerce(other)
+        [other, @value]
+      end
+
+      # Marker method to identify as a typed integer
+      def cassandra_typed_integer?
+        true
+      end
+    end
+  end
+end
+
+# Add conversion methods to Integer
+class Integer
+  def to_tinyint
+    CassandraC::Types::TinyInt.new(self)
+  end
+
+  def to_smallint
+    CassandraC::Types::SmallInt.new(self)
+  end
+
+  def to_int
+    CassandraC::Types::Int.new(self)
+  end
+
+  def to_bigint
+    CassandraC::Types::BigInt.new(self)
+  end
+
+  def to_varint
+    CassandraC::Types::VarInt.new(self)
+  end
+end
