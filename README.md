@@ -2,6 +2,8 @@
 
 CassandraC is a Ruby gem that provides bindings for the Datastax C/C++ Cassandra Driver. It's designed to offer high-performance access to Cassandra databases from Ruby applications through a native C extension.
 
+> **🤖 AI-Assisted Development Experiment**: This project is an experiment in using AI (Claude) to write production-quality code. See [COSTS.md](COSTS.md) for detailed cost tracking of AI-generated features.
+
 ## Installation
 
 Before installing the gem, you must have the Cassandra C/C++ driver installed on your system.
