@@ -12,3 +12,6 @@
 *.a
 mkmf.log
 Gemfile.lock
+
+# Environment variables
+.env
