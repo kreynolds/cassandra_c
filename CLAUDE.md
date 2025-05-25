@@ -153,6 +153,57 @@ statement.bind_by_name("keyspace_name", "system")
 session.close
 ```
 
+### Integer Types Usage
+
+CassandraC provides typed integer wrappers that map to specific Cassandra types:
+
+```ruby
+require 'cassandra_c'
+
+# Create typed integers with conversion methods
+tiny_val = 42.to_cassandra_tinyint        # TinyInt: 8-bit (-128 to 127)
+small_val = 1000.to_cassandra_smallint    # SmallInt: 16-bit (-32,768 to 32,767)
+int_val = 50000.to_cassandra_int          # Int: 32-bit (-2,147,483,648 to 2,147,483,647)  
+big_val = 9223372036854775807.to_cassandra_bigint  # BigInt: 64-bit
+var_val = 123456789012345678901234567890.to_cassandra_varint  # VarInt: unlimited precision
+
+# Use in prepared statements
+session.query("CREATE TABLE users (id int, score tinyint, points smallint, balance bigint, total varint)")
+
+prepared = session.prepare("INSERT INTO users (id, score, points, balance, total) VALUES (?, ?, ?, ?, ?)")
+statement = prepared.bind([
+  1.to_cassandra_int,
+  85.to_cassandra_tinyint, 
+  1500.to_cassandra_smallint,
+  999999999999.to_cassandra_bigint,
+  999999999999999999999999999999.to_cassandra_varint
+])
+session.execute(statement)
+
+# Results return typed integers  
+result = session.query("SELECT * FROM users WHERE id = 1")
+row = result.to_a.first
+
+row[0].class  # => CassandraC::Types::Int
+row[1].class  # => CassandraC::Types::TinyInt
+row[2].class  # => CassandraC::Types::SmallInt
+row[3].class  # => CassandraC::Types::BigInt  
+row[4].class  # => CassandraC::Types::VarInt
+
+# Convert back to regular Ruby integers
+row[0].to_i   # => 1
+row[1].to_i   # => 85
+row[4].to_i   # => 999999999999999999999999999999
+
+# Arithmetic operations preserve types with overflow wrapping
+tiny1 = 100.to_cassandra_tinyint
+tiny2 = 50.to_cassandra_tinyint
+result = tiny1 + tiny2  # => TinyInt(150)
+
+# Overflow wraps around
+overflow = 128.to_cassandra_tinyint  # => TinyInt(-128)
+```
+
 ### Test Structure
 
 Tests are organized by namespace:
@@ -162,3 +213,5 @@ Tests are organized by namespace:
   - `test_cluster.rb` - Cluster configuration tests
   - `test_statement.rb` - Statement and binding tests
   - `test_retry_policy.rb` - Retry policy tests
+  - `test_integer_types.rb` - Integer type functionality tests
+  - `test_string_types.rb` - String type functionality tests

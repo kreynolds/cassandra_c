@@ -68,7 +68,15 @@ This document outlines all features and improvements needed to make CassandraC a
 ### Data Types & Value Conversion
 - [ ] **Complete Data Type Support**:
   - [x] **Text/varchar/ASCII types** ✅ (Complete with UTF-8 and ASCII validation, multibyte character support)
-  - [ ] Integer types (tinyint, smallint, int, bigint, varint)
+  - [x] **Integer types** ✅ (Complete with typed wrappers and overflow handling):
+    - [x] TinyInt (8-bit, -128 to 127) for TINYINT
+    - [x] SmallInt (16-bit, -32,768 to 32,767) for SMALLINT  
+    - [x] Int (32-bit, -2,147,483,648 to 2,147,483,647) for INT
+    - [x] BigInt (64-bit) for BIGINT
+    - [x] VarInt (unlimited precision) for VARINT with large number support
+    - [x] Conversion methods: `42.to_cassandra_tinyint`, `1000.to_cassandra_smallint`, etc.
+    - [x] Proper parameter binding and result parsing in C extension
+    - [x] Arithmetic operations preserve types with overflow wrapping
   - [ ] Floating point types (float, double, decimal)
   - [ ] Boolean type
   - [ ] Blob/binary data
@@ -97,8 +105,9 @@ This document outlines all features and improvements needed to make CassandraC a
   - [x] Parameter binding by index
   - [x] Parameter binding by name  
   - [x] Null value binding
+  - [x] Complete integer type binding (tinyint, smallint, int, bigint, varint)
   - [ ] Collection parameter binding
-  - [ ] Additional numeric type binding (int, bigint, etc.)
+  - [ ] Additional numeric type binding (float, double, decimal)
 - [ ] **Batch Statements**:
   - [ ] Logged batch support
   - [ ] Unlogged batch support
