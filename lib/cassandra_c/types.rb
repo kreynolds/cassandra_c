@@ -11,7 +11,7 @@ module CassandraC
 
       # Normalize value to the bit-size range using modulo for overflow
       def self.normalize(num)
-        num = num % (1 << self::BIT_SIZE)
+        num %= (1 << self::BIT_SIZE)
         num -= (1 << self::BIT_SIZE) if num >= (1 << (self::BIT_SIZE - 1))
         num
       end
@@ -22,8 +22,8 @@ module CassandraC
       end
 
       # Delegate most methods to the wrapped integer
-      def method_missing(method, *args, &block)
-        result = @value.send(method, *args, &block)
+      def method_missing(method, ...)
+        result = @value.send(method, ...)
         if result.is_a?(Integer) && ![:==, :<=>, :<, :<=, :>, :>=, :eql?, :hash].include?(method)
           self.class.new(result)
         else
@@ -44,7 +44,7 @@ module CassandraC
       end
 
       def inspect
-        "#{self.class.name.split('::').last}(#{@value})"
+        "#{self.class.name.split("::").last}(#{@value})"
       end
 
       def coerce(other)
@@ -55,7 +55,6 @@ module CassandraC
       def cassandra_typed_integer?
         true
       end
-
     end
 
     # 8-bit signed integer (-128 to 127) - Cassandra TINYINT
@@ -107,8 +106,8 @@ module CassandraC
         "VarInt(#{@value})"
       end
 
-      def method_missing(method, *args, &block)
-        result = @value.send(method, *args, &block)
+      def method_missing(method, ...)
+        result = @value.send(method, ...)
         if result.is_a?(Integer) && ![:==, :<=>, :<, :<=, :>, :>=, :eql?, :hash].include?(method)
           self.class.new(result)
         else
@@ -142,23 +141,23 @@ end
 
 # Add conversion methods to Integer
 class Integer
-  def to_tinyint
+  def to_cassandra_tinyint
     CassandraC::Types::TinyInt.new(self)
   end
 
-  def to_smallint
+  def to_cassandra_smallint
     CassandraC::Types::SmallInt.new(self)
   end
 
-  def to_int
+  def to_cassandra_int
     CassandraC::Types::Int.new(self)
   end
 
-  def to_bigint
+  def to_cassandra_bigint
     CassandraC::Types::BigInt.new(self)
   end
 
-  def to_varint
+  def to_cassandra_varint
     CassandraC::Types::VarInt.new(self)
   end
 end
