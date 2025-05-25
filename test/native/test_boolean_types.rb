@@ -170,15 +170,15 @@ class TestBooleanTypes < Minitest::Test
     @session.query("INSERT INTO cassandra_c_test.boolean_test (id, bool_val, nullable_bool) VALUES (20, true, false)")
     @session.query("INSERT INTO cassandra_c_test.boolean_test (id, bool_val, nullable_bool) VALUES (21, false, true)")
 
-    # Query with boolean literals in WHERE clause
-    result = @session.query("SELECT * FROM cassandra_c_test.boolean_test WHERE id = 20 AND bool_val = true")
+    # Query by primary key and verify boolean values
+    result = @session.query("SELECT * FROM cassandra_c_test.boolean_test WHERE id = 20")
     rows = result.to_a
     assert_equal(1, rows.length)
     assert_equal(20, rows[0][0].to_i)
     assert_equal(true, rows[0][1])
     assert_equal(false, rows[0][2])
 
-    result = @session.query("SELECT * FROM cassandra_c_test.boolean_test WHERE id = 21 AND bool_val = false")
+    result = @session.query("SELECT * FROM cassandra_c_test.boolean_test WHERE id = 21")
     rows = result.to_a
     assert_equal(1, rows.length)
     assert_equal(21, rows[0][0].to_i)

@@ -11,9 +11,10 @@ require "optparse"
 # Script to post CassandraC AI development cost updates to X (Twitter)
 #
 # Usage:
-#   ruby scripts/post_cost_update.rb [feature_name]              # Post to X
-#   ruby scripts/post_cost_update.rb --dry-run [feature_name]   # Preview only
+#   ruby scripts/post_cost_update.rb [feature_name_or_id]       # Post to X
+#   ruby scripts/post_cost_update.rb --dry-run [feature_name_or_id]   # Preview only
 #   ruby scripts/post_cost_update.rb --validate                 # Test credentials
+#   ruby scripts/post_cost_update.rb --list                     # List available features
 #
 # Environment variables required for posting (set in .env file):
 # - X_API_KEY: Your X API key
@@ -63,24 +64,85 @@ class XCostPoster
     false
   end
 
-  def post_latest_feature(feature_name = nil)
+  def list_features
     costs_data = parse_costs_file
-    latest_feature = feature_name || costs_data[:latest_feature]
 
-    if latest_feature.nil?
+    puts "📋 Available features in COSTS.md:"
+    puts "=" * 50
+
+    if costs_data[:features].empty?
+      puts "No features found with cost information"
+      return
+    end
+
+    # Show features in descending order (newest first) but keep original indexing
+    feature_array = costs_data[:features].to_a
+    feature_array.reverse.each_with_index do |(name, data), reverse_index|
+      # Calculate original index for ID consistency
+      original_index = feature_array.length - reverse_index
+      status = (name == costs_data[:latest_feature]) ? " (latest)" : ""
+      duration_info = data[:duration] ? " - #{data[:duration]}" : ""
+      puts "#{original_index}. #{name}#{status}"
+      puts "   Cost: $#{data[:cost]}#{duration_info}"
+
+      # Show first few features
+      if data[:features] && !data[:features].empty?
+        first_features = data[:features].first(2)
+        first_features.each { |feature| puts "   #{feature}" }
+        puts "   ..." if data[:features].length > 2
+      end
+      puts
+    end
+
+    puts "📊 Totals:"
+    puts "   Total cost: $#{costs_data[:totals][:total_cost] || "N/A"}"
+    puts "   Total features: #{costs_data[:totals][:total_features] || "N/A"}"
+    puts
+    puts "💡 Use feature name or ID as argument to post about specific feature"
+    puts "   Example: ruby #{$0} \"Counter Types Support\""
+    puts "   Example: ruby #{$0} 4"
+  end
+
+  def post_latest_feature(feature_identifier = nil)
+    costs_data = parse_costs_file
+
+    # Determine the feature to post about
+    target_feature = if feature_identifier.nil?
+      costs_data[:latest_feature]
+    elsif feature_identifier.match?(/^\d+$/)
+      # Handle numeric ID
+      feature_id = feature_identifier.to_i
+      feature_names = costs_data[:features].keys
+      if feature_id >= 1 && feature_id <= feature_names.length
+        feature_names[feature_id - 1]
+      else
+        puts "❌ Invalid feature ID: #{feature_id}"
+        puts "💡 Use --list to see available features (1-#{feature_names.length})"
+        exit 1
+      end
+    else
+      # Handle feature name
+      feature_identifier
+    end
+
+    if target_feature.nil?
       puts "❌ No feature specified and couldn't determine latest feature"
+      puts "💡 Use --list to see available features"
       exit 1
     end
 
-    feature_data = costs_data[:features][latest_feature]
+    feature_data = costs_data[:features][target_feature]
     if feature_data.nil?
-      puts "❌ Feature '#{latest_feature}' not found in COSTS.md"
+      puts "❌ Feature '#{target_feature}' not found in COSTS.md"
+      puts "💡 Use --list to see available features"
       exit 1
     end
+
+    puts "🎯 Posting about: #{target_feature}"
 
     # Generate tweets
-    main_tweet = generate_main_tweet(latest_feature, feature_data, costs_data[:totals])
-    reply_tweet = generate_reply_tweet(latest_feature, feature_data, costs_data[:totals])
+    main_tweet = generate_main_tweet(target_feature, feature_data, costs_data[:totals])
+    reply_tweet = generate_reply_tweet(target_feature, feature_data, costs_data[:totals])
 
     # Show preview
     puts "📝 Main tweet (#{main_tweet.length} chars):"
@@ -381,11 +443,12 @@ if __FILE__ == $0
   options = {
     dry_run: false,
     debug: false,
-    validate: false
+    validate: false,
+    list: false
   }
 
   OptionParser.new do |opts|
-    opts.banner = "Usage: #{$0} [options] [feature_name]"
+    opts.banner = "Usage: #{$0} [options] [feature_name_or_id]"
 
     opts.on("-n", "--dry-run", "Preview tweets without posting") do
       options[:dry_run] = true
@@ -397,6 +460,10 @@ if __FILE__ == $0
 
     opts.on("-v", "--validate", "Validate API credentials") do
       options[:validate] = true
+    end
+
+    opts.on("-l", "--list", "List available features") do
+      options[:list] = true
     end
 
     opts.on("-h", "--help", "Show this help") do
@@ -412,6 +479,8 @@ if __FILE__ == $0
 
     if options[:validate]
       exit poster.validate_auth ? 0 : 1
+    elsif options[:list]
+      poster.list_features
     else
       poster.post_latest_feature(feature_name)
     end
