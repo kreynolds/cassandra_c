@@ -392,6 +392,47 @@ static VALUE rb_statement_bind_double_by_name(VALUE self, VALUE name, VALUE valu
     return self;
 }
 
+// Bind a decimal value by index (arbitrary precision decimal)
+static VALUE rb_statement_bind_decimal_by_index(VALUE self, VALUE index, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    size_t param_index = NUM2SIZET(index);
+    CassError error = ruby_value_to_cass_decimal(wrapper->statement, param_index, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind decimal parameter at index %zu: %s", 
+                 param_index, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a decimal value by name (arbitrary precision decimal)
+static VALUE rb_statement_bind_decimal_by_name(VALUE self, VALUE name, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    Check_Type(name, T_STRING);
+    const char* param_name = StringValueCStr(name);
+    CassError error = ruby_value_to_cass_decimal_by_name(wrapper->statement, param_name, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind decimal parameter '%s': %s", 
+                 param_name, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
 // Initialize the Statement class within the CassandraC module
 VALUE cCassStatement;
 void Init_cassandra_c_statement(VALUE module) {
@@ -416,4 +457,6 @@ void Init_cassandra_c_statement(VALUE module) {
     rb_define_method(cCassStatement, "bind_float_by_name", rb_statement_bind_float_by_name, 2);
     rb_define_method(cCassStatement, "bind_double_by_index", rb_statement_bind_double_by_index, 2);
     rb_define_method(cCassStatement, "bind_double_by_name", rb_statement_bind_double_by_name, 2);
+    rb_define_method(cCassStatement, "bind_decimal_by_index", rb_statement_bind_decimal_by_index, 2);
+    rb_define_method(cCassStatement, "bind_decimal_by_name", rb_statement_bind_decimal_by_name, 2);
 }

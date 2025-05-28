@@ -1,3 +1,5 @@
+require "bigdecimal"
+
 module CassandraC
   module Types
     # Abstract base class for fixed-width signed integers
@@ -240,6 +242,94 @@ module CassandraC
         true
       end
     end
+
+    # Arbitrary precision decimal - Cassandra DECIMAL
+    class Decimal
+      def initialize(value, scale = nil)
+        case value
+        when BigDecimal
+          @value = value
+          @scale = scale || value.scale
+        when String
+          @value = BigDecimal(value)
+          @scale = scale || @value.scale
+        when Numeric
+          @value = BigDecimal(value.to_s)
+          @scale = scale || @value.scale
+        else
+          raise ArgumentError, "Value must be numeric or string, got #{value.class}"
+        end
+
+        # Ensure scale is non-negative
+        @scale = [@scale, 0].max
+      end
+
+      def to_d
+        @value
+      end
+
+      def to_f
+        @value.to_f
+      end
+
+      def to_s
+        @value.to_s("F")
+      end
+
+      attr_reader :scale
+
+      def unscaled_value
+        (@value * (10**@scale)).to_i
+      end
+
+      def inspect
+        "Decimal(#{@value}, scale: #{@scale})"
+      end
+
+      def method_missing(method, ...)
+        result = @value.send(method, ...)
+        if result.is_a?(BigDecimal) && ![:==, :<=>, :<, :<=, :>, :>=, :eql?, :hash].include?(method)
+          self.class.new(result, @scale)
+        else
+          result
+        end
+      end
+
+      def respond_to_missing?(method, include_private = false)
+        @value.respond_to?(method, include_private) || super
+      end
+
+      def ==(other)
+        @value == case other
+        when Decimal
+          other.to_d
+        when BigDecimal
+          other
+        else
+          BigDecimal(other.to_s)
+        end
+      end
+
+      def <=>(other)
+        @value <=> case other
+        when Decimal
+          other.to_d
+        when BigDecimal
+          other
+        else
+          BigDecimal(other.to_s)
+        end
+      end
+
+      def coerce(other)
+        [BigDecimal(other.to_s), @value]
+      end
+
+      # Marker method to identify as a typed decimal
+      def cassandra_typed_decimal?
+        true
+      end
+    end
   end
 end
 
@@ -272,6 +362,10 @@ class Integer
   def to_cassandra_double
     CassandraC::Types::Double.new(self)
   end
+
+  def to_cassandra_decimal(scale = nil)
+    CassandraC::Types::Decimal.new(self, scale)
+  end
 end
 
 # Add conversion methods to Float
@@ -282,5 +376,23 @@ class Float
 
   def to_cassandra_double
     CassandraC::Types::Double.new(self)
+  end
+
+  def to_cassandra_decimal(scale = nil)
+    CassandraC::Types::Decimal.new(self, scale)
+  end
+end
+
+# Add conversion methods to String
+class String
+  def to_cassandra_decimal(scale = nil)
+    CassandraC::Types::Decimal.new(self, scale)
+  end
+end
+
+# Add conversion methods to BigDecimal
+class BigDecimal
+  def to_cassandra_decimal(scale = nil)
+    CassandraC::Types::Decimal.new(self, scale)
   end
 end

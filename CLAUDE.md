@@ -350,6 +350,48 @@ float_val = precise_value.to_cassandra_float   # May lose precision
 double_val = precise_value.to_cassandra_double # Retains more precision
 ```
 
+### Decimal Types Usage
+
+CassandraC supports arbitrary precision decimal data using typed wrappers:
+
+```ruby
+require 'cassandra_c'
+require 'bigdecimal'
+
+# Create typed decimals with conversion methods
+decimal_val = "123.456789".to_cassandra_decimal      # Decimal: arbitrary precision
+decimal_from_float = 3.14159.to_cassandra_decimal    # Decimal: from float
+decimal_from_bigdecimal = BigDecimal("999.123456789012345").to_cassandra_decimal
+
+# Specify explicit scale (decimal places)
+decimal_with_scale = "12.34".to_cassandra_decimal(4) # Scale of 4 decimal places
+
+# Use in Ruby applications (C binding not yet fully implemented)
+decimal1 = "123.456".to_cassandra_decimal
+decimal2 = "789.012".to_cassandra_decimal
+
+# Arithmetic operations preserve types
+result = decimal1 + decimal2  # => Decimal(912.468, scale: 3)
+
+# Conversion methods
+decimal1.to_f     # => 123.456 (Float)
+decimal1.to_d     # => BigDecimal('123.456')
+decimal1.to_s     # => "123.456"
+decimal1.scale    # => 3 (number of decimal places)
+decimal1.unscaled_value  # => 123456 (value * 10^scale)
+
+# Comparison operations
+decimal1 == BigDecimal("123.456")  # => true
+decimal1 < decimal2                # => true
+
+# Marker method for type identification
+decimal1.cassandra_typed_decimal?  # => true
+
+# Note: Full Cassandra DECIMAL binding requires varint encoding implementation
+# Currently supports Ruby-side operations and type safety
+# Cassandra binding will be completed in future versions
+```
+
 ### Test Structure
 
 Tests are organized by namespace:

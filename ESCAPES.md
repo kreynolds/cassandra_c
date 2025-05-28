@@ -38,6 +38,48 @@ This document tracks bug fixes, issues, and "escapes" that were discovered and r
 - Primary key-only queries for verification when possible
 - Consider adding Cassandra query pattern guidelines to CLAUDE.md
 
+### Missing DECIMAL Type Implementation
+**Type**: Code Escape  
+**Cost**: TBD  
+**Duration**: TBD  
+**Date**: Decimal/Floating Point Types feature development session
+
+**Issue**: 
+- Original prompt requested implementation of "decimal/floating point types"
+- Only implemented FLOAT (32-bit) and DOUBLE (64-bit) IEEE 754 types
+- Missed DECIMAL type which provides arbitrary precision decimal arithmetic
+- DECIMAL is a distinct Cassandra type from FLOAT/DOUBLE with different use cases
+
+**Root Cause**:
+- Incomplete analysis of Cassandra decimal types during research phase
+- Focused on IEEE 754 floating point without considering arbitrary precision decimal
+- Did not verify DECIMAL type support in DataStax C/C++ driver
+- Assumed "decimal/floating point" only referred to IEEE 754 standard types
+
+**Resolution**:
+- Research DECIMAL type support in DataStax driver - ✅ Found CASS_VALUE_TYPE_DECIMAL support
+- Implement CassandraC::Types::Decimal class for arbitrary precision - ✅ Complete Ruby implementation
+- Add DECIMAL binding and result extraction methods - ✅ Framework implemented (varint encoding TODO)
+- Create comprehensive tests for DECIMAL operations - ✅ 5 Ruby-side test cases added
+- Update documentation with DECIMAL usage examples - ✅ Added to CLAUDE.md
+
+**Implementation Status**:
+- Ruby Type System: ✅ Complete (BigDecimal integration, arithmetic, comparisons)
+- C Method Framework: ✅ Complete (bind_decimal_by_index/name methods)
+- Varint Encoding: ⚠️ Not implemented (returns CASS_ERROR_LIB_INVALID_VALUE_TYPE)
+- Result Extraction: ✅ Complete (converts varint to Ruby Decimal)
+- Documentation: ✅ Complete with implementation notes
+
+**Next Steps for Full DECIMAL Support**:
+- Implement proper varint byte array encoding for Cassandra DECIMAL binding
+- Add integration tests with actual Cassandra DECIMAL columns
+- Complete bind_decimal functionality with real varint conversion
+
+**Prevention**:
+- More thorough type system analysis during research phase
+- Explicit verification of all requested types before implementation
+- Cross-reference original requirements during feature completion review
+
 ## Escape Analysis
 
 ### Cost Impact

@@ -12,6 +12,13 @@ static VALUE cVarInt = Qnil;
 // Ruby classes for floating point types (will be looked up at runtime)
 static VALUE cFloat = Qnil;
 static VALUE cDouble = Qnil;
+static VALUE cDecimal = Qnil;
+
+// Forward declarations
+static VALUE ruby_decimal_from_varint(const cass_byte_t* varint, size_t varint_size, cass_int32_t scale);
+static void ruby_integer_to_varint_bytes(VALUE integer, cass_byte_t** varint_bytes, size_t* varint_size);
+static void ruby_decimal_to_varint_bytes(VALUE decimal, cass_byte_t** varint_bytes, size_t* varint_size, cass_int32_t* scale);
+static VALUE ruby_varint_bytes_to_integer(const cass_byte_t* varint, size_t varint_size);
 
 // Helper function to initialize type class references
 static void init_type_classes() {
@@ -25,6 +32,7 @@ static void init_type_classes() {
         cVarInt = rb_const_get(mTypes, rb_intern("VarInt"));
         cFloat = rb_const_get(mTypes, rb_intern("Float"));
         cDouble = rb_const_get(mTypes, rb_intern("Double"));
+        cDecimal = rb_const_get(mTypes, rb_intern("Decimal"));
     }
 }
 
@@ -133,6 +141,10 @@ CassError ruby_value_to_cass_statement(CassStatement* statement, size_t index, V
                     cass_double_t val = NUM2DBL(float_val);
                     return cass_statement_bind_double(statement, index, val);
                 }
+            }
+            // Check if it's a typed decimal
+            if (rb_respond_to(rb_value, rb_intern("cassandra_typed_decimal?"))) {
+                return ruby_value_to_cass_decimal(statement, index, rb_value);
             }
             // Fall through to default case for other objects
         }
@@ -318,6 +330,17 @@ VALUE cass_value_to_ruby(const CassValue* value) {
             cass_value_get_float(value, &f);
             VALUE args[] = { rb_float_new(f) };
             rb_value = rb_class_new_instance(1, args, cFloat);
+            break;
+        }
+        case CASS_VALUE_TYPE_DECIMAL: {
+            init_type_classes();
+            const cass_byte_t* varint;
+            size_t varint_size;
+            cass_int32_t scale;
+            cass_value_get_decimal(value, &varint, &varint_size, &scale);
+            
+            // Convert varint bytes to Ruby BigDecimal
+            rb_value = ruby_decimal_from_varint(varint, varint_size, scale);
             break;
         }
         case CASS_VALUE_TYPE_UUID: {
@@ -602,4 +625,224 @@ CassError ruby_value_to_cass_double_by_name(CassStatement* statement, const char
     }
     
     return cass_statement_bind_double_by_name(statement, name, double_val);
+}
+
+// Helper function to encode Ruby integer to varint bytes
+static void ruby_integer_to_varint_bytes(VALUE integer, cass_byte_t** varint_bytes, size_t* varint_size) {
+    // For simplicity and to avoid complex varint encoding issues, 
+    // we'll use a more direct approach that works with Ruby's integer representation
+    
+    // Check if zero
+    VALUE zero = INT2NUM(0);
+    if (rb_funcall(integer, rb_intern("=="), 1, zero) == Qtrue) {
+        *varint_bytes = (cass_byte_t*)malloc(1);
+        (*varint_bytes)[0] = 0;
+        *varint_size = 1;
+        return;
+    }
+    
+    // Get absolute value for magnitude calculation
+    VALUE abs_val = rb_funcall(integer, rb_intern("abs"), 0);
+    int is_negative = (rb_funcall(integer, rb_intern("<"), 1, zero) == Qtrue);
+    
+    // Calculate minimum number of bytes needed
+    // Using bit_length method if available, otherwise estimate
+    VALUE bit_length;
+    if (rb_respond_to(abs_val, rb_intern("bit_length"))) {
+        bit_length = rb_funcall(abs_val, rb_intern("bit_length"), 0);
+    } else {
+        // Estimate: log2(value) + 1
+        VALUE str_val = rb_funcall(abs_val, rb_intern("to_s"), 0);
+        size_t str_len = RSTRING_LEN(str_val);
+        bit_length = INT2NUM((int)(str_len * 4)); // Conservative estimate
+    }
+    
+    size_t byte_length = (NUM2INT(bit_length) + 7) / 8;
+    if (byte_length == 0) byte_length = 1;
+    
+    // For negative numbers, we may need an extra byte for sign extension
+    if (is_negative) byte_length++;
+    
+    unsigned char* bytes = (unsigned char*)malloc(byte_length);
+    memset(bytes, 0, byte_length);
+    
+    // Extract bytes using Ruby's bit shift operations
+    VALUE temp = abs_val;
+    size_t actual_bytes = 0;
+    
+    for (size_t i = 0; i < byte_length && rb_funcall(temp, rb_intern(">"), 1, zero) == Qtrue; i++) {
+        VALUE byte_val = rb_funcall(temp, rb_intern("&"), 1, INT2NUM(0xFF));
+        bytes[byte_length - 1 - i] = NUM2INT(byte_val);
+        temp = rb_funcall(temp, rb_intern(">>"), 1, INT2NUM(8));
+        actual_bytes = i + 1;
+    }
+    
+    if (actual_bytes == 0) {
+        actual_bytes = 1;
+    }
+    
+    // Adjust buffer size to actual bytes needed
+    if (actual_bytes < byte_length) {
+        memmove(bytes, bytes + byte_length - actual_bytes, actual_bytes);
+        bytes = (unsigned char*)realloc(bytes, actual_bytes);
+        byte_length = actual_bytes;
+    }
+    
+    // Apply two's complement for negative numbers
+    if (is_negative) {
+        // Invert all bits
+        for (size_t i = 0; i < byte_length; i++) {
+            bytes[i] = ~bytes[i];
+        }
+        
+        // Add 1
+        int carry = 1;
+        for (int i = (int)byte_length - 1; i >= 0 && carry; i--) {
+            int sum = bytes[i] + carry;
+            bytes[i] = sum & 0xFF;
+            carry = sum >> 8;
+        }
+        
+        // Ensure sign extension for negative numbers
+        if (carry || (bytes[0] & 0x80) == 0) {
+            bytes = (unsigned char*)realloc(bytes, byte_length + 1);
+            memmove(bytes + 1, bytes, byte_length);
+            bytes[0] = 0xFF;
+            byte_length++;
+        }
+    }
+    
+    *varint_bytes = (cass_byte_t*)bytes;
+    *varint_size = byte_length;
+}
+
+// Helper function to convert Ruby BigDecimal to varint bytes for DECIMAL
+static void ruby_decimal_to_varint_bytes(VALUE decimal, cass_byte_t** varint_bytes, size_t* varint_size, cass_int32_t* scale) {
+    // Get the unscaled value and scale from the Decimal object
+    VALUE unscaled_val = rb_funcall(decimal, rb_intern("unscaled_value"), 0);
+    VALUE scale_val = rb_funcall(decimal, rb_intern("scale"), 0);
+    *scale = NUM2INT(scale_val);
+    
+    // Convert the unscaled integer to varint bytes
+    ruby_integer_to_varint_bytes(unscaled_val, varint_bytes, varint_size);
+}
+
+// Helper function to convert varint bytes to Ruby integer
+static VALUE ruby_varint_bytes_to_integer(const cass_byte_t* varint, size_t varint_size) {
+    if (varint_size == 0) {
+        return INT2NUM(0);
+    }
+    
+    // Check if the number is negative (MSB of first byte is set)
+    int is_negative = (varint[0] & 0x80) != 0;
+    
+    // Build the number from bytes (big-endian)
+    VALUE result = INT2NUM(0);
+    VALUE byte_multiplier = INT2NUM(1);
+    
+    // Process bytes from right to left (least significant first for our calculation)
+    for (int i = (int)varint_size - 1; i >= 0; i--) {
+        unsigned char byte_val = varint[i];
+        
+        // If negative, we need to handle two's complement
+        if (is_negative) {
+            // For two's complement, we first invert all bits, then add 1
+            // We'll do this at the end for the complete number
+        }
+        
+        VALUE byte_contribution = rb_funcall(INT2NUM(byte_val), rb_intern("*"), 1, byte_multiplier);
+        result = rb_funcall(result, rb_intern("+"), 1, byte_contribution);
+        byte_multiplier = rb_funcall(byte_multiplier, rb_intern("*"), 1, INT2NUM(256));
+    }
+    
+    // Handle two's complement for negative numbers
+    if (is_negative) {
+        // Calculate 2^(bits) - result for two's complement
+        VALUE max_val = rb_funcall(INT2NUM(2), rb_intern("**"), 1, INT2NUM((int)(varint_size * 8)));
+        result = rb_funcall(result, rb_intern("-"), 1, max_val);
+    }
+    
+    return result;
+}
+
+// Helper function to convert varint bytes to Ruby Decimal
+static VALUE ruby_decimal_from_varint(const cass_byte_t* varint, size_t varint_size, cass_int32_t scale) {
+    // Convert varint bytes to Ruby integer
+    VALUE unscaled = ruby_varint_bytes_to_integer(varint, varint_size);
+    
+    // Create BigDecimal from unscaled value and scale  
+    VALUE decimal_str = rb_funcall(unscaled, rb_intern("to_s"), 0);
+    VALUE big_decimal = rb_funcall(rb_mKernel, rb_intern("BigDecimal"), 1, decimal_str);
+    
+    // Apply the scale (divide by 10^scale)
+    if (scale > 0) {
+        VALUE divisor = rb_funcall(INT2NUM(10), rb_intern("**"), 1, INT2NUM(scale));
+        big_decimal = rb_funcall(big_decimal, rb_intern("/"), 1, divisor);
+    }
+    
+    // Create CassandraC::Types::Decimal instance
+    init_type_classes();
+    VALUE args[] = { big_decimal, INT2NUM(scale) };
+    return rb_class_new_instance(2, args, cDecimal);
+}
+
+// Type-specific binding functions for decimal (arbitrary precision)
+CassError ruby_value_to_cass_decimal(CassStatement* statement, size_t index, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null(statement, index);
+    }
+    
+    cass_int32_t scale;
+    
+    // Handle CassandraC::Types::Decimal objects
+    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
+    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
+    VALUE cDecimal = rb_const_get(mTypes, rb_intern("Decimal"));
+    
+    if (rb_obj_is_kind_of(rb_value, cDecimal)) {
+        cass_byte_t* varint_bytes;
+        size_t varint_size;
+        ruby_decimal_to_varint_bytes(rb_value, &varint_bytes, &varint_size, &scale);
+        
+        CassError error = cass_statement_bind_decimal(statement, index, varint_bytes, varint_size, scale);
+        
+        // Free the allocated varint bytes
+        free(varint_bytes);
+        
+        return error;
+    } else {
+        // Try to create a Decimal from the value
+        VALUE decimal = rb_funcall(rb_value, rb_intern("to_cassandra_decimal"), 0);
+        return ruby_value_to_cass_decimal(statement, index, decimal);
+    }
+}
+
+CassError ruby_value_to_cass_decimal_by_name(CassStatement* statement, const char* name, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null_by_name(statement, name);
+    }
+    
+    cass_int32_t scale;
+    
+    // Handle CassandraC::Types::Decimal objects
+    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
+    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
+    VALUE cDecimal = rb_const_get(mTypes, rb_intern("Decimal"));
+    
+    if (rb_obj_is_kind_of(rb_value, cDecimal)) {
+        cass_byte_t* varint_bytes;
+        size_t varint_size;
+        ruby_decimal_to_varint_bytes(rb_value, &varint_bytes, &varint_size, &scale);
+        
+        CassError error = cass_statement_bind_decimal_by_name(statement, name, varint_bytes, varint_size, scale);
+        
+        // Free the allocated varint bytes
+        free(varint_bytes);
+        
+        return error;
+    } else {
+        // Try to create a Decimal from the value
+        VALUE decimal = rb_funcall(rb_value, rb_intern("to_cassandra_decimal"), 0);
+        return ruby_value_to_cass_decimal_by_name(statement, name, decimal);
+    }
 }
