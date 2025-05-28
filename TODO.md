@@ -77,7 +77,15 @@ This document outlines all features and improvements needed to make CassandraC a
     - [x] Conversion methods: `42.to_cassandra_tinyint`, `1000.to_cassandra_smallint`, etc.
     - [x] Proper parameter binding and result parsing in C extension
     - [x] Arithmetic operations preserve types with overflow wrapping
-  - [ ] Floating point types (float, double, decimal)
+  - [x] **Floating point and decimal types** ✅ (Complete with arbitrary precision support):
+    - [x] Float (32-bit IEEE 754) with `bind_float_by_index/name` methods
+    - [x] Double (64-bit IEEE 754) with `bind_double_by_index/name` methods  
+    - [x] Decimal (arbitrary precision) with `bind_decimal_by_index/name` methods
+    - [x] Conversion methods: `3.14.to_cassandra_float`, `2.718.to_cassandra_double`, `"123.456".to_cassandra_decimal`
+    - [x] BigDecimal integration for arbitrary precision decimal arithmetic
+    - [x] Varint encoding/decoding for Cassandra DECIMAL compatibility
+    - [x] Type-safe arithmetic operations and comparisons
+    - [x] Proper parameter binding and result parsing in C extension
   - [x] **Boolean type** ✅ (Complete with comprehensive test coverage):
     - [x] True/false value binding by index and name
     - [x] Array parameter binding with boolean values
@@ -131,7 +139,7 @@ This document outlines all features and improvements needed to make CassandraC a
   - [x] Null value binding
   - [x] Complete integer type binding (tinyint, smallint, int, bigint, varint)
   - [ ] Collection parameter binding
-  - [ ] Additional numeric type binding (float, double, decimal)
+  - [x] Complete numeric type binding (float, double, decimal) ✅
 - [ ] **Batch Statements**:
   - [ ] Logged batch support
   - [ ] Unlogged batch support
