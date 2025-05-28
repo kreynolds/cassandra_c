@@ -102,6 +102,10 @@ CassError ruby_string_to_cass_blob(CassStatement* statement, size_t index, VALUE
 CassError ruby_string_to_cass_blob_by_name(CassStatement* statement, const char* name, VALUE rb_value);
 CassError ruby_value_to_cass_inet(CassStatement* statement, size_t index, VALUE rb_value);
 CassError ruby_value_to_cass_inet_by_name(CassStatement* statement, const char* name, VALUE rb_value);
+CassError ruby_value_to_cass_float(CassStatement* statement, size_t index, VALUE rb_value);
+CassError ruby_value_to_cass_float_by_name(CassStatement* statement, const char* name, VALUE rb_value);
+CassError ruby_value_to_cass_double(CassStatement* statement, size_t index, VALUE rb_value);
+CassError ruby_value_to_cass_double_by_name(CassStatement* statement, const char* name, VALUE rb_value);
 
 // ============================================================================
 // Module Initialization Functions

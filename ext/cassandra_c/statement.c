@@ -310,6 +310,88 @@ static VALUE rb_statement_bind_inet_by_name(VALUE self, VALUE name, VALUE value)
     return self;
 }
 
+// Bind a float value by index (32-bit IEEE 754)
+static VALUE rb_statement_bind_float_by_index(VALUE self, VALUE index, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    size_t param_index = NUM2SIZET(index);
+    CassError error = ruby_value_to_cass_float(wrapper->statement, param_index, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind float parameter at index %zu: %s", 
+                 param_index, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a float value by name (32-bit IEEE 754)
+static VALUE rb_statement_bind_float_by_name(VALUE self, VALUE name, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    Check_Type(name, T_STRING);
+    const char* param_name = StringValueCStr(name);
+    CassError error = ruby_value_to_cass_float_by_name(wrapper->statement, param_name, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind float parameter '%s': %s", 
+                 param_name, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a double value by index (64-bit IEEE 754)
+static VALUE rb_statement_bind_double_by_index(VALUE self, VALUE index, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    size_t param_index = NUM2SIZET(index);
+    CassError error = ruby_value_to_cass_double(wrapper->statement, param_index, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind double parameter at index %zu: %s", 
+                 param_index, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a double value by name (64-bit IEEE 754)
+static VALUE rb_statement_bind_double_by_name(VALUE self, VALUE name, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    Check_Type(name, T_STRING);
+    const char* param_name = StringValueCStr(name);
+    CassError error = ruby_value_to_cass_double_by_name(wrapper->statement, param_name, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind double parameter '%s': %s", 
+                 param_name, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
 // Initialize the Statement class within the CassandraC module
 VALUE cCassStatement;
 void Init_cassandra_c_statement(VALUE module) {
@@ -330,4 +412,8 @@ void Init_cassandra_c_statement(VALUE module) {
     rb_define_method(cCassStatement, "bind_blob_by_name", rb_statement_bind_blob_by_name, 2);
     rb_define_method(cCassStatement, "bind_inet_by_index", rb_statement_bind_inet_by_index, 2);
     rb_define_method(cCassStatement, "bind_inet_by_name", rb_statement_bind_inet_by_name, 2);
+    rb_define_method(cCassStatement, "bind_float_by_index", rb_statement_bind_float_by_index, 2);
+    rb_define_method(cCassStatement, "bind_float_by_name", rb_statement_bind_float_by_name, 2);
+    rb_define_method(cCassStatement, "bind_double_by_index", rb_statement_bind_double_by_index, 2);
+    rb_define_method(cCassStatement, "bind_double_by_name", rb_statement_bind_double_by_name, 2);
 }

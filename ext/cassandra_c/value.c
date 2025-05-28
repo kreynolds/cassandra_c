@@ -9,6 +9,10 @@ static VALUE cInt = Qnil;
 static VALUE cBigInt = Qnil;
 static VALUE cVarInt = Qnil;
 
+// Ruby classes for floating point types (will be looked up at runtime)
+static VALUE cFloat = Qnil;
+static VALUE cDouble = Qnil;
+
 // Helper function to initialize type class references
 static void init_type_classes() {
     if (cTinyInt == Qnil) {
@@ -19,6 +23,8 @@ static void init_type_classes() {
         cInt = rb_const_get(mTypes, rb_intern("Int"));
         cBigInt = rb_const_get(mTypes, rb_intern("BigInt"));
         cVarInt = rb_const_get(mTypes, rb_intern("VarInt"));
+        cFloat = rb_const_get(mTypes, rb_intern("Float"));
+        cDouble = rb_const_get(mTypes, rb_intern("Double"));
     }
 }
 
@@ -111,6 +117,21 @@ CassError ruby_value_to_cass_statement(CassStatement* statement, size_t index, V
                     const char* str = RSTRING_PTR(str_val);
                     size_t len = RSTRING_LEN(str_val);
                     return cass_statement_bind_string_n(statement, index, str, len);
+                }
+            }
+            // Check if it's a typed float or double
+            if (rb_respond_to(rb_value, rb_intern("cassandra_typed_float?")) || 
+                rb_respond_to(rb_value, rb_intern("cassandra_typed_double?"))) {
+                init_type_classes();
+                VALUE rb_class = rb_obj_class(rb_value);
+                VALUE float_val = rb_funcall(rb_value, rb_intern("to_f"), 0);
+                
+                if (rb_class == cFloat) {
+                    cass_float_t val = (cass_float_t)NUM2DBL(float_val);
+                    return cass_statement_bind_float(statement, index, val);
+                } else if (rb_class == cDouble) {
+                    cass_double_t val = NUM2DBL(float_val);
+                    return cass_statement_bind_double(statement, index, val);
                 }
             }
             // Fall through to default case for other objects
@@ -284,15 +305,19 @@ VALUE cass_value_to_ruby(const CassValue* value) {
             break;
         }
         case CASS_VALUE_TYPE_DOUBLE: {
+            init_type_classes();
             cass_double_t d;
             cass_value_get_double(value, &d);
-            rb_value = rb_float_new(d);
+            VALUE args[] = { rb_float_new(d) };
+            rb_value = rb_class_new_instance(1, args, cDouble);
             break;
         }
         case CASS_VALUE_TYPE_FLOAT: {
+            init_type_classes();
             cass_float_t f;
             cass_value_get_float(value, &f);
-            rb_value = rb_float_new(f);
+            VALUE args[] = { rb_float_new(f) };
+            rb_value = rb_class_new_instance(1, args, cFloat);
             break;
         }
         case CASS_VALUE_TYPE_UUID: {
@@ -479,4 +504,102 @@ CassError ruby_value_to_cass_inet_by_name(CassStatement* statement, const char* 
     }
     
     return cass_statement_bind_inet_by_name(statement, name, inet);
+}
+
+// Type-specific binding functions for float (32-bit IEEE 754)
+CassError ruby_value_to_cass_float(CassStatement* statement, size_t index, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null(statement, index);
+    }
+    
+    cass_float_t float_val;
+    
+    // Handle CassandraC::Types::Float objects
+    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
+    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
+    VALUE cFloat = rb_const_get(mTypes, rb_intern("Float"));
+    
+    if (rb_obj_is_kind_of(rb_value, cFloat)) {
+        VALUE float_value = rb_funcall(rb_value, rb_intern("to_f"), 0);
+        float_val = (cass_float_t)NUM2DBL(float_value);
+    } else if (FIXNUM_P(rb_value) || TYPE(rb_value) == T_BIGNUM || TYPE(rb_value) == T_FLOAT) {
+        float_val = (cass_float_t)NUM2DBL(rb_value);
+    } else {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    return cass_statement_bind_float(statement, index, float_val);
+}
+
+CassError ruby_value_to_cass_float_by_name(CassStatement* statement, const char* name, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null_by_name(statement, name);
+    }
+    
+    cass_float_t float_val;
+    
+    // Handle CassandraC::Types::Float objects
+    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
+    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
+    VALUE cFloat = rb_const_get(mTypes, rb_intern("Float"));
+    
+    if (rb_obj_is_kind_of(rb_value, cFloat)) {
+        VALUE float_value = rb_funcall(rb_value, rb_intern("to_f"), 0);
+        float_val = (cass_float_t)NUM2DBL(float_value);
+    } else if (FIXNUM_P(rb_value) || TYPE(rb_value) == T_BIGNUM || TYPE(rb_value) == T_FLOAT) {
+        float_val = (cass_float_t)NUM2DBL(rb_value);
+    } else {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    return cass_statement_bind_float_by_name(statement, name, float_val);
+}
+
+// Type-specific binding functions for double (64-bit IEEE 754)
+CassError ruby_value_to_cass_double(CassStatement* statement, size_t index, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null(statement, index);
+    }
+    
+    cass_double_t double_val;
+    
+    // Handle CassandraC::Types::Double objects
+    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
+    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
+    VALUE cDouble = rb_const_get(mTypes, rb_intern("Double"));
+    
+    if (rb_obj_is_kind_of(rb_value, cDouble)) {
+        VALUE double_value = rb_funcall(rb_value, rb_intern("to_f"), 0);
+        double_val = NUM2DBL(double_value);
+    } else if (FIXNUM_P(rb_value) || TYPE(rb_value) == T_BIGNUM || TYPE(rb_value) == T_FLOAT) {
+        double_val = NUM2DBL(rb_value);
+    } else {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    return cass_statement_bind_double(statement, index, double_val);
+}
+
+CassError ruby_value_to_cass_double_by_name(CassStatement* statement, const char* name, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null_by_name(statement, name);
+    }
+    
+    cass_double_t double_val;
+    
+    // Handle CassandraC::Types::Double objects
+    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
+    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
+    VALUE cDouble = rb_const_get(mTypes, rb_intern("Double"));
+    
+    if (rb_obj_is_kind_of(rb_value, cDouble)) {
+        VALUE double_value = rb_funcall(rb_value, rb_intern("to_f"), 0);
+        double_val = NUM2DBL(double_value);
+    } else if (FIXNUM_P(rb_value) || TYPE(rb_value) == T_BIGNUM || TYPE(rb_value) == T_FLOAT) {
+        double_val = NUM2DBL(rb_value);
+    } else {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    return cass_statement_bind_double_by_name(statement, name, double_val);
 }

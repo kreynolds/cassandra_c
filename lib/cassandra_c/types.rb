@@ -136,6 +136,110 @@ module CassandraC
         true
       end
     end
+
+    # 32-bit IEEE 754 floating point - Cassandra FLOAT
+    class Float
+      def initialize(value)
+        unless value.is_a?(Numeric)
+          raise ArgumentError, "Value must be numeric, got #{value.class}"
+        end
+        @value = value.to_f
+      end
+
+      def to_f
+        @value
+      end
+
+      def to_s
+        @value.to_s
+      end
+
+      def inspect
+        "Float(#{@value})"
+      end
+
+      def method_missing(method, ...)
+        result = @value.send(method, ...)
+        if result.is_a?(Numeric) && ![:==, :<=>, :<, :<=, :>, :>=, :eql?, :hash].include?(method)
+          self.class.new(result)
+        else
+          result
+        end
+      end
+
+      def respond_to_missing?(method, include_private = false)
+        @value.respond_to?(method, include_private) || super
+      end
+
+      def ==(other)
+        @value == (other.is_a?(self.class) ? other.to_f : other)
+      end
+
+      def <=>(other)
+        @value <=> (other.is_a?(self.class) ? other.to_f : other)
+      end
+
+      def coerce(other)
+        [other, @value]
+      end
+
+      # Marker method to identify as a typed float
+      def cassandra_typed_float?
+        true
+      end
+    end
+
+    # 64-bit IEEE 754 floating point - Cassandra DOUBLE
+    class Double
+      def initialize(value)
+        unless value.is_a?(Numeric)
+          raise ArgumentError, "Value must be numeric, got #{value.class}"
+        end
+        @value = value.to_f
+      end
+
+      def to_f
+        @value
+      end
+
+      def to_s
+        @value.to_s
+      end
+
+      def inspect
+        "Double(#{@value})"
+      end
+
+      def method_missing(method, ...)
+        result = @value.send(method, ...)
+        if result.is_a?(Numeric) && ![:==, :<=>, :<, :<=, :>, :>=, :eql?, :hash].include?(method)
+          self.class.new(result)
+        else
+          result
+        end
+      end
+
+      def respond_to_missing?(method, include_private = false)
+        @value.respond_to?(method, include_private) || super
+      end
+
+      def ==(other)
+        @value == (other.is_a?(self.class) ? other.to_f : other)
+      end
+
+      def <=>(other)
+        @value <=> (other.is_a?(self.class) ? other.to_f : other)
+      end
+
+      def coerce(other)
+        [other, @value]
+      end
+
+      # Marker method to identify as a typed double
+      def cassandra_typed_double?
+        true
+      end
+    end
   end
 end
 
@@ -159,5 +263,24 @@ class Integer
 
   def to_cassandra_varint
     CassandraC::Types::VarInt.new(self)
+  end
+
+  def to_cassandra_float
+    CassandraC::Types::Float.new(self)
+  end
+
+  def to_cassandra_double
+    CassandraC::Types::Double.new(self)
+  end
+end
+
+# Add conversion methods to Float
+class Float
+  def to_cassandra_float
+    CassandraC::Types::Float.new(self)
+  end
+
+  def to_cassandra_double
+    CassandraC::Types::Double.new(self)
   end
 end

@@ -277,6 +277,79 @@ primary_ip = IPAddr.new(row[0])
 backup_ip = IPAddr.new(row[1])
 ```
 
+### Decimal/Floating Point Types Usage
+
+CassandraC supports decimal and floating point data using typed wrappers that map to specific Cassandra types:
+
+```ruby
+require 'cassandra_c'
+
+# Create typed floats and doubles with conversion methods
+float_val = 3.14.to_cassandra_float         # Float: 32-bit IEEE 754
+double_val = 2.718281828.to_cassandra_double # Double: 64-bit IEEE 754
+
+# Create from integers too
+int_float = 42.to_cassandra_float            # Float: 42.0
+int_double = 123.to_cassandra_double         # Double: 123.0
+
+# Use in prepared statements
+session.query("CREATE TABLE metrics (id int, score float, precision_value double)")
+
+prepared = session.prepare("INSERT INTO metrics (id, score, precision_value) VALUES (?, ?, ?)")
+statement = prepared.bind([
+  1.to_cassandra_int,
+  3.14159.to_cassandra_float,
+  2.718281828459045.to_cassandra_double
+])
+session.execute(statement)
+
+# Type-specific binding methods
+statement = prepared.bind
+statement.bind_by_index(0, 2.to_cassandra_int)
+statement.bind_float_by_index(1, 1.23.to_cassandra_float)
+statement.bind_double_by_index(2, 4.56789.to_cassandra_double)
+session.execute(statement)
+
+# Can also bind by name
+statement = prepared.bind
+statement.bind_text_by_name("id", 3)
+statement.bind_float_by_name("score", 9.87)
+statement.bind_double_by_name("precision_value", 1.23456789012345)
+session.execute(statement)
+
+# Can bind raw numeric values too (automatically converted)
+statement = prepared.bind
+statement.bind_by_index(0, 4)               # Raw integer
+statement.bind_float_by_index(1, 7.89)      # Raw float -> 32-bit
+statement.bind_double_by_index(2, 12.345)   # Raw float -> 64-bit
+session.execute(statement)
+
+# Results return typed float/double objects
+result = session.query("SELECT * FROM metrics WHERE id = 1")
+row = result.to_a.first
+
+row[0].class  # => CassandraC::Types::Int
+row[1].class  # => CassandraC::Types::Float
+row[2].class  # => CassandraC::Types::Double
+
+# Convert back to regular Ruby numbers
+row[0].to_i   # => 1
+row[1].to_f   # => 3.14159...
+row[2].to_f   # => 2.718281828459045
+
+# Arithmetic operations preserve types
+float1 = 1.5.to_cassandra_float
+float2 = 2.5.to_cassandra_float
+result = float1 + float2  # => Float(4.0)
+
+# Float vs Double precision
+# Float: 32-bit IEEE 754 (approximately 7 decimal digits)
+# Double: 64-bit IEEE 754 (approximately 15-17 decimal digits)
+precise_value = 1.23456789012345
+float_val = precise_value.to_cassandra_float   # May lose precision
+double_val = precise_value.to_cassandra_double # Retains more precision
+```
+
 ### Test Structure
 
 Tests are organized by namespace:
@@ -291,6 +364,7 @@ Tests are organized by namespace:
   - `test_blob_types.rb` - Blob type functionality tests
   - `test_boolean_types.rb` - Boolean type functionality tests
   - `test_inet_types.rb` - Inet type functionality tests
+  - `test_decimal_types.rb` - Decimal/floating point type functionality tests
 
 ## Development Guidelines
 
