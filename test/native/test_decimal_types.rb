@@ -3,33 +3,11 @@
 require "test_helper"
 
 class TestDecimalTypes < Minitest::Test
-  def self.startup
-    cluster = CassandraC::Native::Cluster.new.tap { |cluster|
-      cluster.contact_points = "127.0.0.1"
-      cluster.port = 9042
-    }
-    session = CassandraC::Native::Session.new
-    session.connect(cluster)
-    session.query("CREATE KEYSPACE IF NOT EXISTS cassandra_c_test WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1}")
-    session.close
-  end
-
   def setup
     @cluster = CassandraC::Native::Cluster.new.tap { |cluster|
       cluster.contact_points = "127.0.0.1"
       cluster.port = 9042
     }
-    self.class.startup unless defined?(@@keyspace_created)
-    @@keyspace_created = true
-
-    # Create test tables
-    unless defined?(@@tables_created)
-      session = CassandraC::Native::Session.new
-      session.connect(@cluster)
-      session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.decimal_types (id int PRIMARY KEY, float_val float, double_val double)")
-      session.close
-      @@tables_created = true
-    end
 
     @session = CassandraC::Native::Session.new
     @session.connect(@cluster)
