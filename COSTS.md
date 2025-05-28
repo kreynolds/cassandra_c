@@ -2,6 +2,20 @@
 
 This document tracks the costs associated with using AI (Claude) to develop features for CassandraC.
 
+## Cost Summary
+
+| Category | Item | Cost | Details |
+|----------|------|------|---------|
+| **Feature** | [Integer Types Support](#integer-types-support) | $4.71 | Complete typed integer wrapper system (5 types) |
+| **Feature** | [Blob Types Support](#blob-types-support) | $1.67 | Binary data storage and retrieval |
+| **Feature** | [Boolean Types Support](#boolean-types-support) | $1.24 | Boolean value binding and result parsing |
+| **Feature** | [Counter Types Support](#counter-types-support) | $0.89 | Counter increment/decrement operations |
+| **Feature** | [Inet Types Support](#inet-types-support) | $1.15 | IP address storage (IPv4/IPv6) |
+| **Feature** | [Decimal/Floating Point Types](#decimalfloating-point-types-support) | $7.84 | FLOAT, DOUBLE, DECIMAL with arbitrary precision |
+| **Refactor** | [Test Suite Refactoring](#test-suite-refactoring) | $1.89 | Centralized helpers, eliminated 62% boilerplate |
+| **Escape** | [Missing DECIMAL Implementation](ESCAPES.md) | $0.15 | Resolved incomplete original implementation |
+| | **Total Project Cost** | **$19.54** | 6 features + 1 refactor + 1 escape resolution |
+
 ## Feature Development Costs
 
 ### Integer Types Support
@@ -142,14 +156,36 @@ This document tracks the costs associated with using AI (Claude) to develop feat
 - Updated CLAUDE.md with comprehensive decimal/floating point documentation
 - Updated ESCAPES.md documenting the missing DECIMAL implementation
 
+### Test Suite Refactoring
+**Cost**: $1.89  
+**Duration**: 28m 15s (wall time), 14m 30s (API time)  
+**Token Usage**: 145.8k input, 22.7k output  
+**Code Changes**: 158 lines added, 420 lines removed (net -262 lines)
+
+**Improvements Implemented**:
+- Centralized test helpers with lazy-initialized cluster/session methods
+- Eliminated duplicate setup/teardown code across all test files
+- Leveraged C extension's RUBY_TYPED_FREE_IMMEDIATELY for automatic cleanup
+- Maintained specialized setup only where needed (counter table truncation)
+- All 90 tests continue to pass with no regressions
+- Significant reduction in test boilerplate (62% code reduction)
+- Improved maintainability and DRY principle adherence
+
+**Key Deliverables**:
+- `test/test_helper.rb` - Enhanced with centralized TestHelpers module
+- All 9 native test files refactored to use shared helpers
+- Automatic linting fixes applied across all test files
+- Git commit documenting comprehensive test cleanup
+
 ## Cost Analysis
 
 ### Total Project Costs
 - **Feature Development Cost**: $17.50
+- **Test Suite Refactoring Cost**: $1.89
 - **Escape Resolution Cost**: $0.15 (see ESCAPES.md)
-- **Total Project Cost**: $17.65
-- **Total Features**: 6 major data type implementations
-- **Average Cost per Feature**: $2.92
+- **Total Project Cost**: $19.54
+- **Total Features**: 6 major data type implementations + 1 major refactoring
+- **Average Cost per Major Deliverable**: $2.79
 
 ### Cost Observations
 1. **Feature complexity correlation with costs**:
@@ -159,12 +195,15 @@ This document tracks the costs associated with using AI (Claude) to develop feat
    - Counter types: $0.89 (81% cheaper, leveraging BigInt type and existing patterns)
    - Inet types: $1.15 (76% cheaper, following established patterns with helper function optimization)
    - Decimal/Floating Point types: $7.84 (66% higher than baseline, complex varint encoding + escape resolution)
+   - Test suite refactoring: $1.89 (60% cheaper than baseline, refactoring existing code rather than new features)
 
 2. **Development velocity varies by complexity**:
    - Counter implementation: ~8 minutes (fastest, leveraging existing patterns)
    - Inet implementation: ~11 minutes (fast, established C binding patterns)
+   - Test suite refactoring: ~28 minutes (moderate, systematic code cleanup across multiple files)
    - Decimal implementation: ~74 minutes (complex varint encoding + escape resolution)
    - Simple features benefit greatly from established patterns
+   - Refactoring tasks provide excellent value (62% code reduction for modest cost)
    - Complex features still require significant implementation time
    - Escape resolution adds overhead but ensures complete functionality
 
@@ -172,8 +211,10 @@ This document tracks the costs associated with using AI (Claude) to develop feat
    - Established C extension patterns for binding and result extraction
    - Helper function approach reduces code duplication (inet implementation)
    - Centralized test setup pattern greatly reduces development time
+   - Test suite refactoring creates reusable patterns for future development
    - DDL guidelines prevent common mistakes
    - Type-specific binding method patterns now well-established
+   - Lazy initialization patterns reduce boilerplate across test files
 
 ### Quality Metrics
 - ✅ All tests passing (90 total test runs across project)
@@ -182,12 +223,14 @@ This document tracks the costs associated with using AI (Claude) to develop feat
 - ✅ Proper error handling and edge cases
 - ✅ Memory management best practices
 - ✅ Centralized test setup reduces duplication
+- ✅ Test suite refactoring eliminates 62% of boilerplate code
 - ✅ No compiler warnings (cleaned up 4 warnings)
 - ✅ Helper function patterns eliminate code duplication
 - ✅ Complete arbitrary precision decimal arithmetic support
 - ✅ Integration with Ruby's BigDecimal class
 - ✅ Varint encoding for Cassandra compatibility
 - ✅ Low escape rate: 1 escape across 6 features (0.85% cost overhead)
+- ✅ Maintainable test patterns for future development
 
 ## Future Cost Predictions
 
@@ -195,6 +238,7 @@ Based on current trends:
 - **Simple features**: $1-3 each due to established patterns (basic types, string variations)
 - **Moderate features**: $3-8 each (complex types like UUID, time types)
 - **Complex features**: $8-15 each (collections, UDTs, custom types requiring encoding)
+- **Refactoring work**: $1-3 each (cleanup, optimization, pattern consolidation)
 - **Total project completion**: Estimated $75-150 for full Cassandra driver
 
 ### Cost Factors
@@ -202,3 +246,5 @@ Based on current trends:
 - **Complex encoding**: Varint, collections increase implementation complexity
 - **Escape resolution**: Adds 10-15% overhead but ensures completeness
 - **Test coverage**: Comprehensive testing adds development time but prevents regressions
+- **Refactoring work**: Provides excellent ROI through maintainability improvements
+- **Technical debt reduction**: Early refactoring prevents future maintenance costs
