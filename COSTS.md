@@ -110,29 +110,63 @@ This document tracks the costs associated with using AI (Claude) to develop feat
 - `test/test_helper.rb` - Added inet table DDL
 - Updated CLAUDE.md, EXAMPLES.md, TODO.md with comprehensive inet documentation
 
+### Decimal/Floating Point Types Support
+**Cost**: $7.84  
+**Duration**: 1h 13m 59s (wall time), 36m 9s (API time)  
+**Token Usage**: 128.2k input, 82.3k output, 15.6m cache read, 500.9k cache write  
+**Code Changes**: 1494 lines added, 255 lines removed
+
+**Features Implemented**:
+- Complete FLOAT (32-bit IEEE 754) and DOUBLE (64-bit IEEE 754) support
+- Arbitrary precision DECIMAL type with BigDecimal integration
+- Varint encoding/decoding for Cassandra DECIMAL compatibility
+- Type-specific binding methods (`bind_float_by_index/name`, `bind_double_by_index/name`, `bind_decimal_by_index/name`)
+- Ruby type wrapper classes with arithmetic operations and comparisons
+- Conversion methods for Integer, Float, String, BigDecimal to typed wrappers
+- Two's complement representation for negative DECIMAL values
+- High precision decimal arithmetic without floating point rounding errors
+- Comprehensive test suite with 17 test methods (90 total test runs)
+- Complete C extension integration with DataStax driver
+- Memory management with proper malloc/free for varint arrays
+- Compiler warning fixes and test suite cleanup
+- Escape resolution from incomplete original implementation
+
+**Key Deliverables**:
+- `lib/cassandra_c/types.rb` - Complete DECIMAL, Float, Double wrapper classes
+- `ext/cassandra_c/value.c` - Varint encoding/decoding, type conversions, result extraction
+- `ext/cassandra_c/statement.c` - DECIMAL binding methods
+- `ext/cassandra_c/cassandra_c.h` - Function declarations
+- `test/native/test_decimal_types.rb` - Complete test suite with helper methods
+- `test/test_helper.rb` - Added decimal_val column to test table
+- `cassandra_c.gemspec` - Added bigdecimal dependency
+- Updated CLAUDE.md with comprehensive decimal/floating point documentation
+- Updated ESCAPES.md documenting the missing DECIMAL implementation
+
 ## Cost Analysis
 
 ### Total Project Costs
-- **Feature Development Cost**: $9.66
+- **Feature Development Cost**: $17.50
 - **Escape Resolution Cost**: $0.15 (see ESCAPES.md)
-- **Total Project Cost**: $9.81
-- **Total Features**: 5 major data type implementations
-- **Average Cost per Feature**: $1.93
+- **Total Project Cost**: $17.65
+- **Total Features**: 6 major data type implementations
+- **Average Cost per Feature**: $2.92
 
 ### Cost Observations
-1. **Decreasing costs per feature** as patterns emerge:
-   - Integer types: $4.71 (baseline implementation)
+1. **Feature complexity correlation with costs**:
+   - Integer types: $4.71 (baseline implementation with 5 type variants)
    - Blob types: $1.67 (65% cheaper, following established patterns)
    - Boolean types: $1.24 (74% cheaper, leveraging existing C code)
    - Counter types: $0.89 (81% cheaper, leveraging BigInt type and existing patterns)
    - Inet types: $1.15 (76% cheaper, following established patterns with helper function optimization)
+   - Decimal/Floating Point types: $7.84 (66% higher than baseline, complex varint encoding + escape resolution)
 
-2. **Development velocity improvements**:
-   - Counter implementation: ~8 minutes (fastest implementation)
-   - Inet implementation: ~11 minutes (still very fast)
-   - Demonstrates accelerating development as patterns solidify
-   - Most work is now test creation and documentation updates
-   - Helper function patterns reduce code duplication
+2. **Development velocity varies by complexity**:
+   - Counter implementation: ~8 minutes (fastest, leveraging existing patterns)
+   - Inet implementation: ~11 minutes (fast, established C binding patterns)
+   - Decimal implementation: ~74 minutes (complex varint encoding + escape resolution)
+   - Simple features benefit greatly from established patterns
+   - Complex features still require significant implementation time
+   - Escape resolution adds overhead but ensures complete functionality
 
 3. **Pattern reuse benefits**:
    - Established C extension patterns for binding and result extraction
@@ -142,20 +176,29 @@ This document tracks the costs associated with using AI (Claude) to develop feat
    - Type-specific binding method patterns now well-established
 
 ### Quality Metrics
-- ✅ All tests passing (73 total tests across project)
+- ✅ All tests passing (90 total test runs across project)
 - ✅ Code follows existing patterns and conventions
 - ✅ Comprehensive documentation across all features
 - ✅ Proper error handling and edge cases
 - ✅ Memory management best practices
 - ✅ Centralized test setup reduces duplication
-- ✅ IPv4 and IPv6 support with proper validation
+- ✅ No compiler warnings (cleaned up 4 warnings)
 - ✅ Helper function patterns eliminate code duplication
-- ✅ Integration with Ruby's IPAddr class
-- ✅ Low escape rate: 1 escape across 5 features (1.5% cost overhead)
+- ✅ Complete arbitrary precision decimal arithmetic support
+- ✅ Integration with Ruby's BigDecimal class
+- ✅ Varint encoding for Cassandra compatibility
+- ✅ Low escape rate: 1 escape across 6 features (0.85% cost overhead)
 
 ## Future Cost Predictions
 
 Based on current trends:
-- **Subsequent features**: Likely $1-3 each due to established patterns
-- **Complex features**: May cost $5-10 (collections, UDTs)
-- **Total project completion**: Estimated $50-100 for full Cassandra driver
+- **Simple features**: $1-3 each due to established patterns (basic types, string variations)
+- **Moderate features**: $3-8 each (complex types like UUID, time types)
+- **Complex features**: $8-15 each (collections, UDTs, custom types requiring encoding)
+- **Total project completion**: Estimated $75-150 for full Cassandra driver
+
+### Cost Factors
+- **Pattern reuse**: Reduces costs for similar implementations
+- **Complex encoding**: Varint, collections increase implementation complexity
+- **Escape resolution**: Adds 10-15% overhead but ensures completeness
+- **Test coverage**: Comprehensive testing adds development time but prevents regressions
