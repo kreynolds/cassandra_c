@@ -3,20 +3,6 @@
 require "test_helper"
 
 class TestStatement < Minitest::Test
-  def setup
-    @cluster = CassandraC::Native::Cluster.new.tap { |cluster|
-      cluster.contact_points = "127.0.0.1"
-      cluster.port = 9042
-    }
-
-    @session = CassandraC::Native::Session.new
-    @session.connect(@cluster)
-  end
-
-  def teardown
-    @session&.close
-  end
-
   def test_create_statement
     statement = CassandraC::Native::Statement.new("SELECT * FROM system_schema.tables")
     assert_instance_of CassandraC::Native::Statement, statement
@@ -24,12 +10,12 @@ class TestStatement < Minitest::Test
 
   def test_execute_query
     # Use system_schema to avoid needing to create a keyspace/table
-    result = @session.execute("SELECT keyspace_name, table_name FROM system_schema.tables LIMIT 5")
+    result = session.execute("SELECT keyspace_name, table_name FROM system_schema.tables LIMIT 5")
     assert_instance_of CassandraC::Native::Result, result
   end
 
   def test_result_enumeration
-    result = @session.execute("SELECT keyspace_name, table_name FROM system_schema.tables LIMIT 5")
+    result = session.execute("SELECT keyspace_name, table_name FROM system_schema.tables LIMIT 5")
     assert result.row_count > 0
     assert_equal 2, result.column_count
 
@@ -48,7 +34,7 @@ class TestStatement < Minitest::Test
   end
 
   def test_row_values
-    result = @session.execute("SELECT keyspace_name, table_name FROM system_schema.tables LIMIT 1")
+    result = session.execute("SELECT keyspace_name, table_name FROM system_schema.tables LIMIT 1")
     row = result.first
 
     # Test Array access

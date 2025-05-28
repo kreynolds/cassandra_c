@@ -3,42 +3,6 @@
 require "test_helper"
 
 class TestIntegerTypes < Minitest::Test
-  def self.startup
-    cluster = CassandraC::Native::Cluster.new.tap { |cluster|
-      cluster.contact_points = "127.0.0.1"
-      cluster.port = 9042
-    }
-    session = CassandraC::Native::Session.new
-    session.connect(cluster)
-    session.query("CREATE KEYSPACE IF NOT EXISTS cassandra_c_test WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1}")
-    session.close
-  end
-
-  def setup
-    @cluster = CassandraC::Native::Cluster.new.tap { |cluster|
-      cluster.contact_points = "127.0.0.1"
-      cluster.port = 9042
-    }
-    self.class.startup unless defined?(@@keyspace_created)
-    @@keyspace_created = true
-
-    # Create test tables
-    unless defined?(@@tables_created)
-      session = CassandraC::Native::Session.new
-      session.connect(@cluster)
-      session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.integer_types (id int PRIMARY KEY, tiny_val tinyint, small_val smallint, int_val int, big_val bigint, var_val varint)")
-      session.close
-      @@tables_created = true
-    end
-
-    @session = CassandraC::Native::Session.new
-    @session.connect(@cluster)
-  end
-
-  def teardown
-    @session&.close
-  end
-
   def test_integer_type_creation
     # Test that we can create typed integers
     tiny = 42.to_cassandra_tinyint
@@ -75,7 +39,7 @@ class TestIntegerTypes < Minitest::Test
 
   def test_prepared_statement_with_typed_integers
     # Test binding typed integers to prepared statements
-    prepared = @session.prepare("INSERT INTO cassandra_c_test.integer_types (id, tiny_val, small_val, int_val, big_val, var_val) VALUES (?, ?, ?, ?, ?, ?)")
+    prepared = session.prepare("INSERT INTO cassandra_c_test.integer_types (id, tiny_val, small_val, int_val, big_val, var_val) VALUES (?, ?, ?, ?, ?, ?)")
 
     tiny = 42.to_cassandra_tinyint
     small = 1000.to_cassandra_smallint
@@ -84,10 +48,10 @@ class TestIntegerTypes < Minitest::Test
     var = 123456789012345678901234567890.to_cassandra_varint
 
     statement = prepared.bind([1.to_cassandra_int, tiny, small, int, big, var])
-    @session.execute(statement)
+    session.execute(statement)
 
     # Verify the data was inserted correctly
-    result = @session.query("SELECT * FROM cassandra_c_test.integer_types WHERE id = 1")
+    result = session.query("SELECT * FROM cassandra_c_test.integer_types WHERE id = 1")
     rows = result.to_a
     assert_equal(1, rows.length)
 

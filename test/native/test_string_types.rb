@@ -3,48 +3,7 @@
 require "test_helper"
 
 class TestStringTypes < Minitest::Test
-  def self.startup
-    cluster = CassandraC::Native::Cluster.new.tap { |cluster|
-      cluster.contact_points = "127.0.0.1"
-      cluster.port = 9042
-    }
-    session = CassandraC::Native::Session.new
-    session.connect(cluster)
-    session.query("CREATE KEYSPACE IF NOT EXISTS cassandra_c_test WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1}")
-    session.close
-  end
-
-  def setup
-    @cluster = CassandraC::Native::Cluster.new.tap { |cluster|
-      cluster.contact_points = "127.0.0.1"
-      cluster.port = 9042
-    }
-    self.class.startup unless defined?(@@keyspace_created)
-    @@keyspace_created = true
-
-    # Create test tables for different string types
-    unless defined?(@@string_tables_created)
-      session = CassandraC::Native::Session.new
-      session.connect(@cluster)
-
-      # Table with text columns (UTF-8)
-      session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.test_text_types (id text PRIMARY KEY, text_col text, varchar_col varchar)")
-
-      # Table with ASCII column
-      session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.test_ascii_types (id text PRIMARY KEY, ascii_col ascii)")
-
-      # Mixed types table
-      session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.test_mixed_strings (id text PRIMARY KEY, text_col text, ascii_col ascii, varchar_col varchar)")
-
-      session.close
-      @@string_tables_created = true
-    end
-  end
-
   def test_text_utf8_support
-    session = CassandraC::Native::Session.new
-    session.connect(@cluster)
-
     # Test UTF-8 strings with various Unicode characters
     utf8_strings = [
       "Hello, 世界!",           # Chinese characters
@@ -72,14 +31,9 @@ class TestStringTypes < Minitest::Test
       assert_kind_of CassandraC::Native::Result, result
       # Note: Full result iteration will be implemented later, but storage/retrieval works
     end
-
-    session.close
   end
 
   def test_varchar_utf8_support
-    session = CassandraC::Native::Session.new
-    session.connect(@cluster)
-
     # Test that varchar behaves identically to text for UTF-8
     utf8_text = "Varchar: 日本語 🇯🇵"
 
@@ -91,14 +45,9 @@ class TestStringTypes < Minitest::Test
 
     result = session.execute(statement)
     assert_kind_of CassandraC::Native::Result, result
-
-    session.close
   end
 
   def test_multibyte_utf8_encoding_validation
-    session = CassandraC::Native::Session.new
-    session.connect(@cluster)
-
     # Test specific multibyte sequences to ensure proper UTF-8 handling
     multibyte_tests = [
       "2-byte: café résumé naïve",          # 2-byte UTF-8 sequences (é, ï)
@@ -122,14 +71,9 @@ class TestStringTypes < Minitest::Test
       result = session.execute(statement)
       assert_kind_of CassandraC::Native::Result, result
     end
-
-    session.close
   end
 
   def test_ascii_validation_success
-    session = CassandraC::Native::Session.new
-    session.connect(@cluster)
-
     # Test valid ASCII strings
     ascii_strings = [
       "Hello World",
@@ -150,14 +94,9 @@ class TestStringTypes < Minitest::Test
       result = session.execute(statement)
       assert_kind_of CassandraC::Native::Result, result
     end
-
-    session.close
   end
 
   def test_ascii_validation_failure
-    session = CassandraC::Native::Session.new
-    session.connect(@cluster)
-
     # Test strings with non-ASCII characters should fail
     non_ascii_strings = [
       "Café",                   # É is > 127
@@ -181,14 +120,9 @@ class TestStringTypes < Minitest::Test
 
       assert_match(/String contains non-ASCII characters/, error.message)
     end
-
-    session.close
   end
 
   def test_ascii_binding_by_name
-    session = CassandraC::Native::Session.new
-    session.connect(@cluster)
-
     # Test valid ASCII by name
     prepared = session.prepare("INSERT INTO cassandra_c_test.test_ascii_types (id, ascii_col) VALUES (:id, :ascii_col)")
     statement = prepared.bind
@@ -207,14 +141,9 @@ class TestStringTypes < Minitest::Test
     end
 
     assert_match(/String contains non-ASCII characters/, error.message)
-
-    session.close
   end
 
   def test_mixed_string_types_in_same_table
-    session = CassandraC::Native::Session.new
-    session.connect(@cluster)
-
     # Test a table with mixed string column types
     prepared = session.prepare("INSERT INTO cassandra_c_test.test_mixed_strings (id, text_col, ascii_col, varchar_col) VALUES (?, ?, ?, ?)")
     statement = prepared.bind
@@ -226,14 +155,9 @@ class TestStringTypes < Minitest::Test
 
     result = session.execute(statement)
     assert_kind_of CassandraC::Native::Result, result
-
-    session.close
   end
 
   def test_null_values_for_string_types
-    session = CassandraC::Native::Session.new
-    session.connect(@cluster)
-
     # Test that nil values work for all string types
     prepared = session.prepare("INSERT INTO cassandra_c_test.test_mixed_strings (id, text_col, ascii_col, varchar_col) VALUES (?, ?, ?, ?)")
     statement = prepared.bind
@@ -245,14 +169,9 @@ class TestStringTypes < Minitest::Test
 
     result = session.execute(statement)
     assert_kind_of CassandraC::Native::Result, result
-
-    session.close
   end
 
   def test_empty_strings
-    session = CassandraC::Native::Session.new
-    session.connect(@cluster)
-
     # Test empty strings for all types
     prepared = session.prepare("INSERT INTO cassandra_c_test.test_mixed_strings (id, text_col, ascii_col, varchar_col) VALUES (?, ?, ?, ?)")
     statement = prepared.bind
@@ -264,14 +183,9 @@ class TestStringTypes < Minitest::Test
 
     result = session.execute(statement)
     assert_kind_of CassandraC::Native::Result, result
-
-    session.close
   end
 
   def test_type_checking_for_non_strings
-    session = CassandraC::Native::Session.new
-    session.connect(@cluster)
-
     prepared = session.prepare("INSERT INTO cassandra_c_test.test_text_types (id, text_col) VALUES (?, ?)")
     statement = prepared.bind
 
@@ -285,7 +199,5 @@ class TestStringTypes < Minitest::Test
 
       assert_match(/wrong argument type/, error.message)
     end
-
-    session.close
   end
 end

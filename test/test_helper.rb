@@ -44,3 +44,26 @@ end
 
 # Call setup immediately when test_helper is loaded
 TestEnvironment.setup
+
+# Shared test helpers with lazy initialization
+module TestHelpers
+  def cluster
+    @_cluster ||= CassandraC::Native::Cluster.new.tap { |cluster|
+      cluster.contact_points = "127.0.0.1"
+      cluster.port = 9042
+    }
+  end
+
+  def session
+    @_session ||= begin
+      session = CassandraC::Native::Session.new
+      session.connect(cluster)
+      session
+    end
+  end
+end
+
+# Include helpers in all test classes
+class Minitest::Test
+  include TestHelpers
+end

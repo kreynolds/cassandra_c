@@ -3,20 +3,6 @@
 require "test_helper"
 
 class TestDecimalTypes < Minitest::Test
-  def setup
-    @cluster = CassandraC::Native::Cluster.new.tap { |cluster|
-      cluster.contact_points = "127.0.0.1"
-      cluster.port = 9042
-    }
-
-    @session = CassandraC::Native::Session.new
-    @session.connect(@cluster)
-  end
-
-  def teardown
-    @session&.close
-  end
-
   def test_decimal_type_creation
     # Test that we can create typed floats and doubles
     float_val = 3.14.to_cassandra_float
@@ -48,16 +34,16 @@ class TestDecimalTypes < Minitest::Test
 
   def test_prepared_statement_with_typed_decimals
     # Test binding typed decimals to prepared statements
-    prepared = @session.prepare("INSERT INTO cassandra_c_test.decimal_types (id, float_val, double_val) VALUES (?, ?, ?)")
+    prepared = session.prepare("INSERT INTO cassandra_c_test.decimal_types (id, float_val, double_val) VALUES (?, ?, ?)")
 
     float_val = 3.14159.to_cassandra_float
     double_val = 2.718281828459045.to_cassandra_double
 
     statement = prepared.bind([1.to_cassandra_int, float_val, double_val])
-    @session.execute(statement)
+    session.execute(statement)
 
     # Verify the data was inserted correctly
-    result = @session.query("SELECT * FROM cassandra_c_test.decimal_types WHERE id = 1")
+    result = session.query("SELECT * FROM cassandra_c_test.decimal_types WHERE id = 1")
     rows = result.to_a
     assert_equal(1, rows.length)
 
@@ -80,17 +66,17 @@ class TestDecimalTypes < Minitest::Test
 
   def test_type_specific_binding_methods
     # Test using type-specific binding methods
-    prepared = @session.prepare("INSERT INTO cassandra_c_test.decimal_types (id, float_val, double_val) VALUES (?, ?, ?)")
+    prepared = session.prepare("INSERT INTO cassandra_c_test.decimal_types (id, float_val, double_val) VALUES (?, ?, ?)")
 
     statement = prepared.bind
     statement.bind_by_index(0, 2.to_cassandra_int)
     statement.bind_float_by_index(1, 1.23.to_cassandra_float)
     statement.bind_double_by_index(2, 4.56789.to_cassandra_double)
 
-    @session.execute(statement)
+    session.execute(statement)
 
     # Verify the data was inserted correctly
-    result = @session.query("SELECT * FROM cassandra_c_test.decimal_types WHERE id = 2")
+    result = session.query("SELECT * FROM cassandra_c_test.decimal_types WHERE id = 2")
     rows = result.to_a
     assert_equal(1, rows.length)
 
@@ -107,17 +93,17 @@ class TestDecimalTypes < Minitest::Test
 
   def test_binding_with_raw_numeric_values
     # Test binding raw Ruby numeric values (should still work)
-    prepared = @session.prepare("INSERT INTO cassandra_c_test.decimal_types (id, float_val, double_val) VALUES (?, ?, ?)")
+    prepared = session.prepare("INSERT INTO cassandra_c_test.decimal_types (id, float_val, double_val) VALUES (?, ?, ?)")
 
     statement = prepared.bind
     statement.bind_by_index(0, 3)  # Raw integer
     statement.bind_float_by_index(1, 7.89)  # Raw float
     statement.bind_double_by_index(2, 12.34567890123)  # Raw float
 
-    @session.execute(statement)
+    session.execute(statement)
 
     # Verify the data was inserted correctly
-    result = @session.query("SELECT * FROM cassandra_c_test.decimal_types WHERE id = 3")
+    result = session.query("SELECT * FROM cassandra_c_test.decimal_types WHERE id = 3")
     rows = result.to_a
     assert_equal(1, rows.length)
 
@@ -280,21 +266,21 @@ class TestDecimalTypes < Minitest::Test
   end
 
   def test_decimal_binding_by_index_methods
-    prepared = @session.prepare("INSERT INTO cassandra_c_test.decimal_types (id, decimal_val) VALUES (?, ?)")
+    prepared = session.prepare("INSERT INTO cassandra_c_test.decimal_types (id, decimal_val) VALUES (?, ?)")
     statement = prepared.bind
     statement.bind_by_index(0, 11.to_cassandra_int)
     statement.bind_decimal_by_index(1, "999.12345".to_cassandra_decimal)
-    @session.execute(statement)
+    session.execute(statement)
 
     verify_decimal_in_db(11, BigDecimal("999.12345"), 5)
   end
 
   def test_decimal_binding_by_name_methods
-    prepared = @session.prepare("INSERT INTO cassandra_c_test.decimal_types (id, decimal_val) VALUES (?, ?)")
+    prepared = session.prepare("INSERT INTO cassandra_c_test.decimal_types (id, decimal_val) VALUES (?, ?)")
     statement = prepared.bind
     statement.bind_by_name("id", 12.to_cassandra_int)
     statement.bind_decimal_by_name("decimal_val", "-456.789".to_cassandra_decimal)
-    @session.execute(statement)
+    session.execute(statement)
 
     verify_decimal_in_db(12, BigDecimal("-456.789"), 3, -456789)
   end
@@ -309,16 +295,16 @@ class TestDecimalTypes < Minitest::Test
 
   # Helper method to insert decimal and verify round-trip
   def insert_and_verify_decimal(id, decimal_val, expected_bigdecimal, expected_scale = nil, expected_unscaled = nil)
-    prepared = @session.prepare("INSERT INTO cassandra_c_test.decimal_types (id, decimal_val) VALUES (?, ?)")
+    prepared = session.prepare("INSERT INTO cassandra_c_test.decimal_types (id, decimal_val) VALUES (?, ?)")
     statement = prepared.bind([id.to_cassandra_int, decimal_val])
-    @session.execute(statement)
+    session.execute(statement)
 
     verify_decimal_in_db(id, expected_bigdecimal, expected_scale, expected_unscaled)
   end
 
   # Helper method to verify decimal value in database
   def verify_decimal_in_db(id, expected_bigdecimal, expected_scale = nil, expected_unscaled = nil)
-    result = @session.query("SELECT * FROM cassandra_c_test.decimal_types WHERE id = #{id}")
+    result = session.query("SELECT * FROM cassandra_c_test.decimal_types WHERE id = #{id}")
     rows = result.to_a
     assert_equal(1, rows.length)
 
