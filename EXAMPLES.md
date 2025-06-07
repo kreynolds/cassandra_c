@@ -434,6 +434,221 @@ special_cases.each do |server_id, original_ip|
 end
 ```
 
+### UUID and TimeUUID Types
+
+```ruby
+# Create table with UUID and TimeUUID columns
+session.query(<<~SQL)
+  CREATE TABLE events (
+    id uuid PRIMARY KEY,
+    event_id timeuuid,
+    user_id uuid,
+    event_name text,
+    created_at timeuuid,
+    updated_at timeuuid
+  )
+SQL
+
+# Generate UUIDs and TimeUUIDs
+event_uuid = CassandraC::Types::Uuid.generate
+user_uuid = "550e8400-e29b-41d4-a716-446655440000".to_cassandra_uuid
+event_timeuuid = CassandraC::Types::TimeUuid.generate
+created_timeuuid = Time.now.to_cassandra_timeuuid
+
+# Insert using UUID and TimeUUID types
+prepared = session.prepare("INSERT INTO events (id, event_id, user_id, event_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
+
+# Type-specific binding methods
+statement = prepared.bind
+statement.bind_uuid_by_index(0, event_uuid)                    # Random UUID
+statement.bind_timeuuid_by_index(1, event_timeuuid)           # Generated TimeUUID
+statement.bind_uuid_by_index(2, user_uuid)                    # UUID from string
+statement.bind_text_by_index(3, "user_login")
+statement.bind_timeuuid_by_index(4, created_timeuuid)         # TimeUUID from Time
+statement.bind_timeuuid_by_index(5, CassandraC::Types::TimeUuid.generate)
+session.execute(statement)
+
+# Bind by name instead of index
+prepared_named = session.prepare("INSERT INTO events (id, event_id, user_id, event_name, created_at) VALUES (:id, :event_id, :user_id, :event_name, :created_at)")
+statement = prepared_named.bind
+statement.bind_uuid_by_name("id", CassandraC::Types::Uuid.generate)
+statement.bind_timeuuid_by_name("event_id", CassandraC::Types::TimeUuid.generate)
+statement.bind_uuid_by_name("user_id", "123e4567-e89b-12d3-a456-426614174000")
+statement.bind_text_by_name("event_name", "page_view")
+statement.bind_timeuuid_by_name("created_at", Time.new(2023, 6, 15, 12, 30, 45).to_cassandra_timeuuid)
+session.execute(statement)
+
+# Bind raw string values (automatically converted)
+statement = prepared.bind
+statement.bind_uuid_by_index(0, "987fcdeb-51a2-4567-8901-23456789abcd")  # Raw UUID string
+statement.bind_timeuuid_by_index(1, CassandraC::Types::TimeUuid.generate.to_s)  # TimeUUID as string
+statement.bind_uuid_by_index(2, user_uuid)
+statement.bind_text_by_index(3, "button_click")
+statement.bind_timeuuid_by_index(4, created_timeuuid)
+session.execute(statement)
+
+# Query UUID and TimeUUID data (returns typed objects)
+result = session.query("SELECT id, event_id, user_id, event_name, created_at FROM events")
+result.each do |row|
+  id, event_id, user_id, event_name, created_at = row
+  
+  puts "Event: #{event_name}"
+  puts "  ID: #{id} (#{id.class})"                    # CassandraC::Types::Uuid
+  puts "  Event ID: #{event_id} (#{event_id.class})"  # CassandraC::Types::TimeUuid
+  puts "  User ID: #{user_id}"
+  puts "  Created: #{created_at.timestamp}"            # Extract Time from TimeUUID
+  puts "  TimeUUID: #{created_at}"
+  puts
+end
+
+# Generate TimeUUIDs for specific timestamps
+timestamps = [
+  Time.new(2023, 1, 1, 0, 0, 0),    # New Year
+  Time.new(2023, 6, 15, 12, 30, 45), # Mid year
+  Time.new(2023, 12, 31, 23, 59, 59) # Year end
+]
+
+timestamps.each_with_index do |timestamp, index|
+  timeuuid = CassandraC::Types::TimeUuid.from_time(timestamp)
+  
+  statement = prepared.bind
+  statement.bind_uuid_by_index(0, CassandraC::Types::Uuid.generate)
+  statement.bind_timeuuid_by_index(1, timeuuid)
+  statement.bind_uuid_by_index(2, user_uuid)
+  statement.bind_text_by_index(3, "scheduled_event_#{index}")
+  statement.bind_timeuuid_by_index(4, timeuuid)
+  session.execute(statement)
+  
+  puts "Scheduled event #{index}: #{timestamp} -> #{timeuuid}"
+  puts "  Extracted time: #{timeuuid.timestamp}"
+  puts "  Time match: #{(timestamp.to_f - timeuuid.timestamp.to_f).abs < 0.01}"
+  puts
+end
+
+# UUID comparison and validation
+uuid1 = "550e8400-e29b-41d4-a716-446655440000".to_cassandra_uuid
+uuid2 = "550E8400-E29B-41D4-A716-446655440000".to_cassandra_uuid  # Different case
+uuid3 = CassandraC::Types::Uuid.generate
+
+puts "UUID Comparisons:"
+puts "  uuid1 == uuid2: #{uuid1 == uuid2}"        # true (case insensitive)
+puts "  uuid1 == uuid1.to_s: #{uuid1 == uuid1.to_s}"  # true (can compare with strings)
+puts "  uuid1 == uuid3: #{uuid1 == uuid3}"        # false (different UUIDs)
+
+# TimeUUID chronological ordering
+past_time = Time.new(2020, 1, 1)
+current_time = Time.now
+future_time = Time.new(2030, 1, 1)
+
+past_timeuuid = CassandraC::Types::TimeUuid.from_time(past_time)
+current_timeuuid = CassandraC::Types::TimeUuid.from_time(current_time)
+future_timeuuid = CassandraC::Types::TimeUuid.from_time(future_time)
+
+puts "\nTimeUUID Chronological Order:"
+puts "  Past: #{past_timeuuid} (#{past_time})"
+puts "  Current: #{current_timeuuid} (#{current_time})"
+puts "  Future: #{future_timeuuid} (#{future_time})"
+puts "  Past < Current: #{past_timeuuid < current_timeuuid}"
+puts "  Current < Future: #{current_timeuuid < future_timeuuid}"
+
+# Handle null values
+prepared_null = session.prepare("INSERT INTO events (id, event_id, user_id, event_name) VALUES (?, ?, ?, ?)")
+statement = prepared_null.bind
+statement.bind_uuid_by_index(0, CassandraC::Types::Uuid.generate)
+statement.bind_timeuuid_by_index(1, nil)    # Null TimeUUID
+statement.bind_uuid_by_index(2, nil)        # Null UUID
+statement.bind_text_by_index(3, "null_test")
+session.execute(statement)
+
+# Query with null values
+result = session.query("SELECT event_id, user_id FROM events WHERE event_name = 'null_test'")
+row = result.to_a.first
+puts "\nNull handling:"
+puts "  Event ID: #{row[0].inspect}"  # nil
+puts "  User ID: #{row[1].inspect}"   # nil
+
+# TimeUUID utilities and edge cases
+puts "\nTimeUUID Utilities:"
+
+# Generate multiple TimeUUIDs in sequence
+sequence_timeuuids = []
+5.times do |i|
+  # Small delay to ensure different timestamps
+  sleep(0.001)
+  timeuuid = CassandraC::Types::TimeUuid.generate
+  sequence_timeuuids << timeuuid
+  puts "  #{i}: #{timeuuid} -> #{timeuuid.timestamp.strftime('%H:%M:%S.%L')}"
+end
+
+# Verify chronological order
+puts "  Chronologically ordered: #{sequence_timeuuids == sequence_timeuuids.sort}"
+
+# TimeUUID version validation
+puts "\nTimeUUID Version Validation:"
+valid_timeuuid = CassandraC::Types::TimeUuid.generate
+puts "  Generated TimeUUID: #{valid_timeuuid}"
+puts "  Version (should be 1): #{valid_timeuuid.to_s[14]}"
+puts "  Variant (should be 8-b): #{valid_timeuuid.to_s[19]}"
+
+# Try to create TimeUUID from non-version-1 UUID (will fail)
+begin
+  invalid_uuid = "550e8400-e29b-41d4-a716-446655440000"  # Version 4 UUID
+  CassandraC::Types::TimeUuid.new(invalid_uuid)
+rescue ArgumentError => e
+  puts "  Expected error for version 4 UUID: #{e.message}"
+end
+
+# UUID format validation
+puts "\nUUID Format Validation:"
+valid_formats = [
+  "550e8400-e29b-41d4-a716-446655440000",
+  "550E8400-E29B-41D4-A716-446655440000",  # Mixed case
+  "00000000-0000-0000-0000-000000000000"   # All zeros
+]
+
+invalid_formats = [
+  "550e8400-e29b-41d4-a716-44665544000",   # Missing digit
+  "550e8400-e29b-41d4-a716-446655440000x",  # Extra character
+  "550e8400e29b41d4a716446655440000",       # No hyphens
+  "not-a-uuid-at-all"
+]
+
+valid_formats.each do |format|
+  begin
+    uuid = CassandraC::Types::Uuid.new(format)
+    puts "  Valid: #{format} -> #{uuid}"
+  rescue ArgumentError => e
+    puts "  Unexpected error: #{format} -> #{e.message}"
+  end
+end
+
+invalid_formats.each do |format|
+  begin
+    uuid = CassandraC::Types::Uuid.new(format)
+    puts "  Unexpected success: #{format} -> #{uuid}"
+  rescue ArgumentError => e
+    puts "  Expected error: #{format} -> #{e.message}"
+  end
+end
+
+# Performance considerations for UUID generation
+puts "\nUUID Generation Performance:"
+start_time = Time.now
+
+# Generate many UUIDs
+1000.times { CassandraC::Types::Uuid.generate }
+uuid_time = Time.now - start_time
+
+start_time = Time.now
+
+# Generate many TimeUUIDs
+1000.times { CassandraC::Types::TimeUuid.generate }
+timeuuid_time = Time.now - start_time
+
+puts "  1000 UUIDs: #{(uuid_time * 1000).round(2)}ms"
+puts "  1000 TimeUUIDs: #{(timeuuid_time * 1000).round(2)}ms"
+```
+
 ## Advanced Usage
 
 ### Async Operations

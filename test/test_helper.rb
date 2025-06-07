@@ -44,6 +44,7 @@ module TestEnvironment
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.single_counter (id text PRIMARY KEY, count counter)")
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.inet_types (id text PRIMARY KEY, ip_address inet, server_ip inet)")
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.decimal_types (id int PRIMARY KEY, float_val float, double_val double, decimal_val decimal)")
+    session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.uuid_types (id text PRIMARY KEY, uuid_val uuid, timeuuid_val timeuuid, created_at timeuuid)")
 
     session.close
     @@setup_complete = true
