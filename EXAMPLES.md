@@ -451,7 +451,7 @@ SQL
 
 # Generate UUIDs and TimeUUIDs
 event_uuid = CassandraC::Types::Uuid.generate
-user_uuid = "550e8400-e29b-41d4-a716-446655440000".to_cassandra_uuid
+user_uuid = CassandraC::Types::Uuid.generate  # Generate random UUID instead of hard-coded
 event_timeuuid = CassandraC::Types::TimeUuid.generate
 created_timeuuid = Time.now.to_cassandra_timeuuid
 
@@ -473,14 +473,14 @@ prepared_named = session.prepare("INSERT INTO events (id, event_id, user_id, eve
 statement = prepared_named.bind
 statement.bind_uuid_by_name("id", CassandraC::Types::Uuid.generate)
 statement.bind_timeuuid_by_name("event_id", CassandraC::Types::TimeUuid.generate)
-statement.bind_uuid_by_name("user_id", "123e4567-e89b-12d3-a456-426614174000")
+statement.bind_uuid_by_name("user_id", CassandraC::Types::Uuid.generate)
 statement.bind_text_by_name("event_name", "page_view")
 statement.bind_timeuuid_by_name("created_at", Time.new(2023, 6, 15, 12, 30, 45).to_cassandra_timeuuid)
 session.execute(statement)
 
 # Bind raw string values (automatically converted)
 statement = prepared.bind
-statement.bind_uuid_by_index(0, "987fcdeb-51a2-4567-8901-23456789abcd")  # Raw UUID string
+statement.bind_uuid_by_index(0, CassandraC::Types::Uuid.generate.to_s)  # Generated UUID as string
 statement.bind_timeuuid_by_index(1, CassandraC::Types::TimeUuid.generate.to_s)  # TimeUUID as string
 statement.bind_uuid_by_index(2, user_uuid)
 statement.bind_text_by_index(3, "button_click")
@@ -526,8 +526,9 @@ timestamps.each_with_index do |timestamp, index|
 end
 
 # UUID comparison and validation
-uuid1 = "550e8400-e29b-41d4-a716-446655440000".to_cassandra_uuid
-uuid2 = "550E8400-E29B-41D4-A716-446655440000".to_cassandra_uuid  # Different case
+uuid_str = CassandraC::Types::Uuid.generate.to_s
+uuid1 = uuid_str.to_cassandra_uuid
+uuid2 = uuid_str.upcase.to_cassandra_uuid  # Same UUID, different case
 uuid3 = CassandraC::Types::Uuid.generate
 
 puts "UUID Comparisons:"
@@ -592,7 +593,7 @@ puts "  Variant (should be 8-b): #{valid_timeuuid.to_s[19]}"
 
 # Try to create TimeUUID from non-version-1 UUID (will fail)
 begin
-  invalid_uuid = "550e8400-e29b-41d4-a716-446655440000"  # Version 4 UUID
+  invalid_uuid = SecureRandom.uuid  # SecureRandom.uuid generates version 4 UUIDs
   CassandraC::Types::TimeUuid.new(invalid_uuid)
 rescue ArgumentError => e
   puts "  Expected error for version 4 UUID: #{e.message}"
@@ -600,16 +601,18 @@ end
 
 # UUID format validation
 puts "\nUUID Format Validation:"
+# Generate a sample UUID for testing formats
+sample_uuid = CassandraC::Types::Uuid.generate.to_s
 valid_formats = [
-  "550e8400-e29b-41d4-a716-446655440000",
-  "550E8400-E29B-41D4-A716-446655440000",  # Mixed case
-  "00000000-0000-0000-0000-000000000000"   # All zeros
+  sample_uuid,
+  sample_uuid.upcase,  # Mixed case
+  "00000000-0000-0000-0000-000000000000"   # All zeros (special case)
 ]
 
 invalid_formats = [
-  "550e8400-e29b-41d4-a716-44665544000",   # Missing digit
-  "550e8400-e29b-41d4-a716-446655440000x",  # Extra character
-  "550e8400e29b41d4a716446655440000",       # No hyphens
+  sample_uuid[0..-2],   # Missing digit
+  sample_uuid + "x",    # Extra character
+  sample_uuid.gsub("-", ""),  # No hyphens
   "not-a-uuid-at-all"
 ]
 
