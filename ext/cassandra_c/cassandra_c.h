@@ -54,6 +54,10 @@ typedef struct {
     CassResult* result;
 } ResultWrapper;
 
+typedef struct {
+    CassBatch* batch;
+} BatchWrapper;
+
 // ============================================================================
 // Ruby Data Type Definitions
 // ============================================================================
@@ -64,6 +68,7 @@ extern const rb_data_type_t future_type;
 extern const rb_data_type_t prepared_type;
 extern const rb_data_type_t statement_type;
 extern const rb_data_type_t result_type;
+extern const rb_data_type_t batch_type;
 
 // ============================================================================
 // Ruby Class Declarations
@@ -73,6 +78,7 @@ extern VALUE cCassStatement;
 extern VALUE cCassResult;
 extern VALUE cCassFuture;
 extern VALUE cCassPrepared;
+extern VALUE cCassBatch;
 
 // ============================================================================
 // Core Function Declarations
@@ -87,6 +93,7 @@ VALUE future_new(CassFuture* future);
 VALUE prepared_new(const CassPrepared* prepared);
 VALUE statement_new(CassStatement* statement);
 VALUE result_new(CassResult* result);
+VALUE batch_new(CassBatch* batch);
 
 // Value conversion
 VALUE cass_value_to_ruby(const CassValue* value);
@@ -123,5 +130,6 @@ void Init_cassandra_c_future(VALUE module);
 void Init_cassandra_c_prepared(VALUE module);
 void Init_cassandra_c_statement(VALUE module);
 void Init_cassandra_c_result(VALUE module);
+void Init_cassandra_c_batch(VALUE module);
 
 #endif /* CASSANDRA_C_H */
