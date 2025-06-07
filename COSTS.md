@@ -12,10 +12,11 @@ This document tracks the costs associated with using AI (Claude) to develop feat
 | **Feature** | [Counter Types Support](#counter-types-support) | $0.89 | Counter increment/decrement operations |
 | **Feature** | [Inet Types Support](#inet-types-support) | $1.15 | IP address storage (IPv4/IPv6) |
 | **Feature** | [Decimal/Floating Point Types](#decimalfloating-point-types-support) | $7.84 | FLOAT, DOUBLE, DECIMAL with arbitrary precision |
+| **Feature** | [UUID/TimeUUID Types Support](#uuidtimeuuid-types-support) | $2.15 | UUID and TimeUUID with timestamp extraction |
 | **Refactor** | [Test Suite Refactoring](#test-suite-refactoring) | $1.89 | Centralized helpers, eliminated 62% boilerplate |
 | **Quality** | [SimpleCov Integration & Coverage Enhancement](#simplecov-integration--coverage-enhancement) | $3.47 | Added coverage tracking, raised coverage to 95.57% |
 | **Escape** | [Missing DECIMAL Implementation](ESCAPES.md) | $0.15 | Resolved incomplete original implementation |
-| | **Total Project Cost** | **$23.01** | 6 features + 2 refactors + 1 escape resolution |
+| | **Total Project Cost** | **$25.16** | 7 features + 2 refactors + 1 escape resolution |
 
 ## Feature Development Costs
 
@@ -157,6 +158,36 @@ This document tracks the costs associated with using AI (Claude) to develop feat
 - Updated CLAUDE.md with comprehensive decimal/floating point documentation
 - Updated ESCAPES.md documenting the missing DECIMAL implementation
 
+### UUID/TimeUUID Types Support
+**Cost**: $2.15  
+**Duration**: 32m 45s (wall time), 22m 10s (API time)  
+**Token Usage**: 189.4k input, 31.2k output  
+**Code Changes**: 623 lines added, 12 lines removed
+
+**Features Implemented**:
+- Complete UUID type with string validation and case-insensitive comparison
+- TimeUUID type with timestamp extraction and chronological ordering
+- `bind_uuid_by_index` and `bind_uuid_by_name` binding methods
+- `bind_timeuuid_by_index` and `bind_timeuuid_by_name` binding methods
+- Conversion methods: `"uuid-string".to_cassandra_uuid`, `Time.now.to_cassandra_timeuuid`
+- TimeUUID generation from timestamps with `CassandraC::Types::TimeUuid.from_time`
+- Automatic UUID v4 generation with `CassandraC::Types::Uuid.generate`
+- TimeUUID timestamp extraction with `timeuuid.timestamp` method
+- Proper type detection in results (UUID vs TimeUUID based on version)
+- TimeUUID generation with proper version 1 UUID format and variant bits
+- Comprehensive test suite with 21 test cases covering all functionality
+- Complete C extension integration with automatic type detection
+
+**Key Deliverables**:
+- `lib/cassandra_c/types.rb` - UUID and TimeUUID wrapper classes with SecureRandom integration
+- `ext/cassandra_c/value.c` - UUID/TimeUUID binding, conversion, and result extraction
+- `ext/cassandra_c/statement.c` - UUID/TimeUUID binding methods
+- `ext/cassandra_c/cassandra_c.h` - Function declarations
+- `test/native/test_uuid_types.rb` - Complete test suite with generation, validation, and edge cases
+- `test/test_helper.rb` - Added UUID table DDL for testing
+- Updated EXAMPLES.md with comprehensive UUID/TimeUUID usage examples
+- Updated TODO.md marking UUID/TimeUUID support complete
+
 ### Test Suite Refactoring
 **Cost**: $1.89  
 **Duration**: 28m 15s (wall time), 14m 30s (API time)  
@@ -205,13 +236,13 @@ This document tracks the costs associated with using AI (Claude) to develop feat
 ## Cost Analysis
 
 ### Total Project Costs
-- **Feature Development Cost**: $17.50
+- **Feature Development Cost**: $19.65
 - **Test Suite Refactoring Cost**: $1.89
 - **Quality/Coverage Enhancement Cost**: $3.47
 - **Escape Resolution Cost**: $0.15 (see ESCAPES.md)
-- **Total Project Cost**: $23.01
-- **Total Features**: 6 major data type implementations + 2 major refactoring/quality improvements
-- **Average Cost per Major Deliverable**: $2.88
+- **Total Project Cost**: $25.16
+- **Total Features**: 7 major data type implementations + 2 major refactoring/quality improvements
+- **Average Cost per Major Deliverable**: $2.79
 
 ### Cost Observations
 1. **Feature complexity correlation with costs**:
@@ -221,6 +252,7 @@ This document tracks the costs associated with using AI (Claude) to develop feat
    - Counter types: $0.89 (81% cheaper, leveraging BigInt type and existing patterns)
    - Inet types: $1.15 (76% cheaper, following established patterns with helper function optimization)
    - Decimal/Floating Point types: $7.84 (66% higher than baseline, complex varint encoding + escape resolution)
+   - UUID/TimeUUID types: $2.15 (54% cheaper than baseline, moderate complexity with timestamp generation)
    - Test suite refactoring: $1.89 (60% cheaper than baseline, refactoring existing code rather than new features)
    - SimpleCov integration: $3.47 (26% cheaper than baseline, quality tooling + comprehensive test coverage)
 
@@ -244,7 +276,7 @@ This document tracks the costs associated with using AI (Claude) to develop feat
    - Lazy initialization patterns reduce boilerplate across test files
 
 ### Quality Metrics
-- ✅ All tests passing (90 total test runs across project)
+- ✅ All tests passing (111 total test runs across project)
 - ✅ Code follows existing patterns and conventions
 - ✅ Comprehensive documentation across all features
 - ✅ Proper error handling and edge cases

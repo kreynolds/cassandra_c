@@ -1,4 +1,5 @@
 require "bigdecimal"
+require "securerandom"
 
 module CassandraC
   module Types
@@ -330,6 +331,200 @@ module CassandraC
         true
       end
     end
+
+    # UUID type - Cassandra UUID
+    class Uuid
+      def initialize(value)
+        case value
+        when String
+          # Validate UUID format
+          unless uuid_format?(value)
+            raise ArgumentError, "Invalid UUID format: #{value}"
+          end
+          @value = value.downcase
+        else
+          raise ArgumentError, "Value must be a string, got #{value.class}"
+        end
+      end
+
+      def to_s
+        @value
+      end
+
+      def inspect
+        "Uuid(#{@value})"
+      end
+
+      def ==(other)
+        case other
+        when Uuid
+          @value == other.to_s
+        when String
+          @value == other.downcase
+        else
+          false
+        end
+      end
+
+      def <=>(other)
+        case other
+        when Uuid
+          @value <=> other.to_s
+        when String
+          @value <=> other.downcase
+        end
+      end
+
+      def hash
+        @value.hash
+      end
+
+      def eql?(other)
+        other.is_a?(Uuid) && @value == other.to_s
+      end
+
+      # Marker method to identify as a UUID
+      def cassandra_typed_uuid?
+        true
+      end
+
+      # Generate a random UUID v4
+      def self.generate
+        new(SecureRandom.uuid)
+      end
+
+      private
+
+      def uuid_format?(str)
+        !!(str =~ /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i)
+      end
+    end
+
+    # TimeUUID type - Cassandra TIMEUUID (version 1 UUID)
+    class TimeUuid
+      def initialize(value = nil)
+        if value.nil?
+          @value = self.class.generate.to_s
+        else
+          case value
+          when String
+            # Validate UUID format and version 1
+            unless uuid_format?(value) && timeuuid_version?(value)
+              raise ArgumentError, "Invalid TimeUUID format: #{value}"
+            end
+            @value = value.downcase
+          when Time
+            @value = self.class.from_time(value).to_s
+          else
+            raise ArgumentError, "Value must be a string, Time, or nil, got #{value.class}"
+          end
+        end
+      end
+
+      def to_s
+        @value
+      end
+
+      def inspect
+        "TimeUuid(#{@value})"
+      end
+
+      def ==(other)
+        case other
+        when TimeUuid
+          @value == other.to_s
+        when String
+          @value == other.downcase
+        else
+          false
+        end
+      end
+
+      def <=>(other)
+        case other
+        when TimeUuid
+          @value <=> other.to_s
+        when String
+          @value <=> other.downcase
+        end
+      end
+
+      def hash
+        @value.hash
+      end
+
+      def eql?(other)
+        other.is_a?(TimeUuid) && @value == other.to_s
+      end
+
+      # Extract timestamp from TimeUUID
+      def timestamp
+        # TimeUUID (version 1) contains timestamp in 100-nanosecond intervals
+        # since UUID epoch (October 15, 1582)
+        time_low = @value[0, 8].to_i(16)
+        time_mid = @value[9, 4].to_i(16)
+        time_hi = @value[14, 4].to_i(16) & 0x0FFF # Remove version bits
+
+        # Combine into 60-bit timestamp
+        uuid_time = (time_hi << 48) | (time_mid << 32) | time_low
+
+        # Convert from UUID epoch to Unix epoch
+        # UUID epoch: Oct 15, 1582 00:00:00 UTC
+        # Unix epoch: Jan 1, 1970 00:00:00 UTC
+        # Difference: 122192928000000000 (100-nanosecond intervals)
+        unix_time_100ns = uuid_time - 0x01B21DD213814000
+
+        # Convert to seconds and microseconds
+        unix_seconds = unix_time_100ns / 10_000_000
+        microseconds = (unix_time_100ns % 10_000_000) / 10
+
+        Time.at(unix_seconds, microseconds)
+      end
+
+      # Marker method to identify as a TimeUUID
+      def cassandra_typed_timeuuid?
+        true
+      end
+
+      # Generate a new TimeUUID for current time
+      def self.generate(timestamp = Time.now)
+        from_time(timestamp)
+      end
+
+      # Generate TimeUUID from specific timestamp
+      def self.from_time(timestamp)
+        # Convert Unix timestamp to UUID timestamp (100-nanosecond intervals since UUID epoch)
+        unix_time_100ns = (timestamp.to_f * 10_000_000).to_i
+        uuid_time = unix_time_100ns + 0x01B21DD213814000
+
+        # Extract time components
+        time_low = uuid_time & 0xFFFFFFFF
+        time_mid = (uuid_time >> 32) & 0xFFFF
+        time_hi = ((uuid_time >> 48) & 0x0FFF) | 0x1000 # Version 1
+
+        # Generate random clock sequence and node
+        clock_seq = SecureRandom.random_number(0x4000) | 0x8000 # Variant bits
+        node = SecureRandom.random_number(0x1000000000000) | 0x010000000000 # Multicast bit
+
+        # Format as UUID string
+        uuid_str = sprintf("%08x-%04x-%04x-%04x-%012x",
+          time_low, time_mid, time_hi, clock_seq, node)
+
+        new(uuid_str)
+      end
+
+      private
+
+      def uuid_format?(str)
+        !!(str =~ /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i)
+      end
+
+      def timeuuid_version?(str)
+        # Check if it's version 1 (time-based UUID)
+        version_char = str[14]
+        version_char == "1"
+      end
+    end
   end
 end
 
@@ -394,5 +589,23 @@ end
 class BigDecimal
   def to_cassandra_decimal(scale = nil)
     CassandraC::Types::Decimal.new(self, scale)
+  end
+end
+
+# Add conversion methods to String
+class String
+  def to_cassandra_uuid
+    CassandraC::Types::Uuid.new(self)
+  end
+
+  def to_cassandra_timeuuid
+    CassandraC::Types::TimeUuid.new(self)
+  end
+end
+
+# Add conversion methods to Time
+class Time
+  def to_cassandra_timeuuid
+    CassandraC::Types::TimeUuid.new(self)
   end
 end

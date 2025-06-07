@@ -97,7 +97,17 @@ This document outlines all features and improvements needed to make CassandraC a
     - [x] Binary data storage and retrieval with ASCII-8BIT encoding
     - [x] Support for all binary data types (files, raw bytes, etc.)
     - [x] Proper null and empty data handling
-  - [ ] UUID and TimeUUID types
+  - [x] **UUID and TimeUUID types** ✅ (Complete with comprehensive test coverage):
+    - [x] UUID type with string validation and case-insensitive comparison
+    - [x] TimeUUID type with timestamp extraction and chronological ordering
+    - [x] `bind_uuid_by_index` and `bind_uuid_by_name` methods
+    - [x] `bind_timeuuid_by_index` and `bind_timeuuid_by_name` methods
+    - [x] Conversion methods: `"uuid-string".to_cassandra_uuid`, `Time.now.to_cassandra_timeuuid`
+    - [x] TimeUUID generation from timestamps with `CassandraC::Types::TimeUuid.from_time`
+    - [x] Automatic UUID v4 generation with `CassandraC::Types::Uuid.generate`
+    - [x] TimeUUID timestamp extraction with `timeuuid.timestamp`
+    - [x] Proper type detection in results (UUID vs TimeUUID based on version)
+    - [x] String and IPAddr object support, null handling
   - [ ] Date and time types (date, time, timestamp)
   - [x] **Inet type (IP addresses)** ✅ (Complete with comprehensive IPv4/IPv6 support):
     - [x] `bind_inet_by_index` and `bind_inet_by_name` methods
