@@ -150,12 +150,16 @@ This document outlines all features and improvements needed to make CassandraC a
   - [x] Complete integer type binding (tinyint, smallint, int, bigint, varint)
   - [ ] Collection parameter binding
   - [x] Complete numeric type binding (float, double, decimal) ✅
-- [ ] **Batch Statements**:
-  - [ ] Logged batch support
-  - [ ] Unlogged batch support
-  - [ ] Counter batch support
-  - [ ] Mixed statement batching
-  - [ ] Batch size limits and warnings
+- [x] **Batch Statements** ✅ (Complete with comprehensive batch support):
+  - [x] Logged batch support with atomicity guarantees
+  - [x] Unlogged batch support for performance
+  - [x] Counter batch support for counter operations
+  - [x] Mixed statement batching with bound parameters
+  - [x] Batch configuration (consistency, serial consistency, timestamp, timeout, idempotent)
+  - [x] Async batch execution support
+  - [x] Ruby convenience methods (batch(), logged_batch(), unlogged_batch(), counter_batch())
+  - [x] Block-based batch builder interface with Batch.build()
+  - [x] Comprehensive test coverage for all batch functionality
 
 ### Query Features
 - [ ] **Paging Support**:
@@ -273,6 +277,12 @@ This document outlines all features and improvements needed to make CassandraC a
   - [ ] Configurable log levels
   - [ ] Structured logging support
   - [ ] Integration with Ruby logging frameworks
+  - [ ] **Server-side Warning System**:
+    - [ ] Capture and surface Cassandra server-side warnings
+    - [ ] Organized warning categorization (performance, schema, batch size, etc.)
+    - [ ] Warning level configuration and filtering
+    - [ ] Integration with Ruby logging frameworks for warnings
+    - [ ] Warning aggregation and rate limiting
 - [ ] **Health Checks**:
   - [ ] Connection health monitoring
   - [ ] Cluster health status

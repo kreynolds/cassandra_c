@@ -223,6 +223,54 @@ static VALUE rb_session_execute(int argc, VALUE* argv, VALUE self) {
     }
 }
 
+// Execute a batch statement
+static VALUE rb_session_execute_batch(int argc, VALUE* argv, VALUE self) {
+    VALUE batch, options;
+    rb_scan_args(argc, argv, "1:", &batch, &options);
+
+    SessionWrapper* wrapper;
+    TypedData_Get_Struct(self, SessionWrapper, &session_type, wrapper);
+
+    BatchWrapper* batch_wrapper;
+    TypedData_Get_Struct(batch, BatchWrapper, &batch_type, batch_wrapper);
+
+    if (batch_wrapper->batch == NULL) {
+        rb_raise(rb_eCassandraError, "Batch is NULL");
+    }
+
+    // Execute the batch and capture the future
+    CassFuture* future = cass_session_execute_batch(wrapper->session, batch_wrapper->batch);
+
+    // Check if async option is provided and true
+    VALUE async = Qfalse;
+    if (!NIL_P(options)) {
+        async = rb_hash_aref(options, ID2SYM(rb_intern("async")));
+    }
+
+    if (RTEST(async)) {
+        // Return a Future object for async operation
+        return future_new(future);
+    } else {
+        // Wait for the execution to complete
+        cass_future_wait(future);
+
+        // Check for errors
+        CassError error = cass_future_error_code(future);
+        if (error != CASS_OK) {
+            raise_future_error(future, "Failed to execute batch");
+        }
+
+        // Get the result
+        const CassResult* result = cass_future_get_result(future);
+        // Cast away const since we transfer ownership to Ruby's GC via result_new
+        VALUE rb_result = result_new((CassResult*)result);
+        
+        cass_future_free(future);
+        
+        return rb_result;
+    }
+}
+
 // Execute a query - convenience method that creates a statement and executes it
 static VALUE rb_session_query(int argc, VALUE* argv, VALUE self) {
     return rb_session_execute(argc, argv, self);
@@ -239,6 +287,7 @@ void Init_cassandra_c_session(VALUE module) {
     rb_define_method(cSession, "client_id", rb_session_get_client_id, 0);
     rb_define_method(cSession, "prepare", rb_session_prepare, -1);
     rb_define_method(cSession, "execute", rb_session_execute, -1);
+    rb_define_method(cSession, "execute_batch", rb_session_execute_batch, -1);
     rb_define_method(cSession, "query", rb_session_query, -1);
 }
  
