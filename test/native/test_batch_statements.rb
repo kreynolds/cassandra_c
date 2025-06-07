@@ -43,6 +43,17 @@ class TestBatchStatements < Minitest::Test
     end
   end
 
+  def test_create_batch_with_invalid_parameter_type
+    assert_raises(ArgumentError) do
+      CassandraC::Native::Batch.new("not_a_symbol_or_integer")
+    end
+  end
+
+  def test_create_batch_with_no_parameters
+    batch = CassandraC::Native::Batch.new
+    assert_instance_of CassandraC::Native::Batch, batch
+  end
+
   def test_add_statement_to_batch
     batch = CassandraC::Native::Batch.new(:logged)
     statement = CassandraC::Native::Statement.new("INSERT INTO cassandra_c_test.test_types (id, text_col) VALUES (?, ?)", 2)
@@ -53,6 +64,37 @@ class TestBatchStatements < Minitest::Test
 
     # Batch should accept the statement without error
     assert_instance_of CassandraC::Native::Batch, batch
+  end
+
+  def test_add_invalid_object_to_batch
+    batch = CassandraC::Native::Batch.new(:logged)
+    
+    assert_raises(TypeError) do
+      batch.add("not_a_statement")
+    end
+  end
+
+  def test_add_all_convenience_method
+    batch = CassandraC::Native::Batch.new(:logged)
+    
+    statement1 = CassandraC::Native::Statement.new("INSERT INTO cassandra_c_test.test_types (id, text_col) VALUES (?, ?)", 2)
+    statement1.bind_by_index(0, "add_all_1")
+    statement1.bind_by_index(1, "Add All 1")
+    
+    statement2 = CassandraC::Native::Statement.new("INSERT INTO cassandra_c_test.test_types (id, text_col) VALUES (?, ?)", 2)
+    statement2.bind_by_index(0, "add_all_2") 
+    statement2.bind_by_index(1, "Add All 2")
+    
+    result = batch.add_all([statement1, statement2])
+    assert_equal batch, result  # Should return self
+    
+    # Execute to verify it worked
+    session.execute_batch(batch)
+    
+    # Verify the inserts worked
+    verify_result = session.query("SELECT id, text_col FROM cassandra_c_test.test_types WHERE id IN ('add_all_1', 'add_all_2')")
+    rows = verify_result.to_a
+    assert_equal 2, rows.length
   end
 
   def test_execute_logged_batch_with_inserts
@@ -158,6 +200,35 @@ class TestBatchStatements < Minitest::Test
     assert_equal "Consistency Test", row[0]
   end
 
+  def test_batch_with_invalid_consistency_level
+    batch = CassandraC::Native::Batch.new(:logged)
+    
+    assert_raises(ArgumentError) do
+      batch.consistency = :invalid_consistency
+    end
+  end
+
+  def test_batch_with_integer_consistency_level
+    batch = CassandraC::Native::Batch.new(:logged)
+    batch.consistency = 1  # ONE consistency level
+    
+    statement = CassandraC::Native::Statement.new("INSERT INTO cassandra_c_test.test_types (id, text_col) VALUES (?, ?)", 2)
+    statement.bind_by_index(0, "int_consistency_test")
+    statement.bind_by_index(1, "Int Consistency Test")
+    batch.add(statement)
+
+    result = session.execute_batch(batch)
+    assert_instance_of CassandraC::Native::Result, result
+  end
+
+  def test_batch_with_invalid_consistency_type
+    batch = CassandraC::Native::Batch.new(:logged)
+    
+    assert_raises(ArgumentError) do
+      batch.consistency = "not_a_symbol_or_integer"
+    end
+  end
+
   def test_batch_with_serial_consistency
     batch = CassandraC::Native::Batch.new(:logged)
     batch.serial_consistency = :serial
@@ -169,6 +240,35 @@ class TestBatchStatements < Minitest::Test
 
     result = session.execute_batch(batch)
     assert_instance_of CassandraC::Native::Result, result
+  end
+
+  def test_batch_with_invalid_serial_consistency
+    batch = CassandraC::Native::Batch.new(:logged)
+    
+    assert_raises(ArgumentError) do
+      batch.serial_consistency = :invalid_serial_consistency
+    end
+  end
+
+  def test_batch_with_integer_serial_consistency
+    batch = CassandraC::Native::Batch.new(:logged)
+    batch.serial_consistency = 8  # SERIAL consistency level
+
+    statement = CassandraC::Native::Statement.new("INSERT INTO cassandra_c_test.test_types (id, text_col) VALUES (?, ?)", 2)
+    statement.bind_by_index(0, "int_serial_test")
+    statement.bind_by_index(1, "Int Serial Test")
+    batch.add(statement)
+
+    result = session.execute_batch(batch)
+    assert_instance_of CassandraC::Native::Result, result
+  end
+
+  def test_batch_with_invalid_serial_consistency_type
+    batch = CassandraC::Native::Batch.new(:logged)
+    
+    assert_raises(ArgumentError) do
+      batch.serial_consistency = "not_a_symbol_or_integer"
+    end
   end
 
   def test_batch_with_timestamp
@@ -272,6 +372,32 @@ class TestBatchStatements < Minitest::Test
     verify_result = session.query("SELECT id, text_col FROM cassandra_c_test.test_types WHERE id IN ('conv1', 'conv2')")
     rows = verify_result.to_a
     assert_equal 2, rows.length
+  end
+
+  def test_convenience_batch_method_with_mixed_types
+    # Test the convenience batch method with mixed Statement and String types
+    statement = CassandraC::Native::Statement.new("INSERT INTO cassandra_c_test.test_types (id, text_col) VALUES (?, ?)", 2)
+    statement.bind_by_index(0, "mixed_stmt")
+    statement.bind_by_index(1, "Mixed Statement")
+    
+    statements = [
+      statement,
+      "INSERT INTO cassandra_c_test.test_types (id, text_col) VALUES ('mixed_str', 'Mixed String')"
+    ]
+
+    result = session.batch(:unlogged, statements)
+    assert_instance_of CassandraC::Native::Result, result
+
+    # Verify the inserts worked
+    verify_result = session.query("SELECT id, text_col FROM cassandra_c_test.test_types WHERE id IN ('mixed_stmt', 'mixed_str')")
+    rows = verify_result.to_a
+    assert_equal 2, rows.length
+  end
+
+  def test_convenience_batch_method_with_invalid_statement_type
+    assert_raises(ArgumentError) do
+      session.batch(:logged, [123])  # Invalid statement type
+    end
   end
 
   def test_logged_batch_convenience_method
