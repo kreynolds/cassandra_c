@@ -113,7 +113,7 @@ class XCostPoster
       # Handle numeric ID
       feature_id = feature_identifier.to_i
       feature_names = costs_data[:features].keys
-      if feature_id >= 1 && feature_id <= feature_names.length
+      if feature_id.between?(1, feature_names.length)
         feature_names[feature_id - 1]
       else
         puts "❌ Invalid feature ID: #{feature_id}"
