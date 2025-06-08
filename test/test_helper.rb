@@ -52,6 +52,7 @@ module TestEnvironment
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.uuid_types (id text PRIMARY KEY, uuid_val uuid, timeuuid_val timeuuid, created_at timeuuid)")
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.list_types (id text PRIMARY KEY, string_list list<text>, int_list list<int>, mixed_list list<text>)")
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.set_types (id text PRIMARY KEY, string_set set<text>, int_set set<int>, mixed_set set<text>)")
+    session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.map_types (id text PRIMARY KEY, string_map map<text, text>, int_map map<text, int>, mixed_map map<text, text>)")
     # String type test tables
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.test_text_types (id text PRIMARY KEY, text_col text, varchar_col varchar)")
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.test_ascii_types (id text PRIMARY KEY, ascii_col ascii)")

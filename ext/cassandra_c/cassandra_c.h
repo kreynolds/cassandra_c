@@ -123,6 +123,8 @@ CassError ruby_value_to_cass_list(CassStatement* statement, size_t index, VALUE 
 CassError ruby_value_to_cass_list_by_name(CassStatement* statement, const char* name, VALUE rb_value);
 CassError ruby_value_to_cass_set(CassStatement* statement, size_t index, VALUE rb_value);
 CassError ruby_value_to_cass_set_by_name(CassStatement* statement, const char* name, VALUE rb_value);
+CassError ruby_value_to_cass_map(CassStatement* statement, size_t index, VALUE rb_value);
+CassError ruby_value_to_cass_map_by_name(CassStatement* statement, const char* name, VALUE rb_value);
 
 // ============================================================================
 // Module Initialization Functions

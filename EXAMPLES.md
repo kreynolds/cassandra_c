@@ -962,6 +962,185 @@ session.execute(statement)
 puts "Successfully stored type-consistent sets"
 ```
 
+### Map Collections
+
+```ruby
+# Create table with map columns for different key-value types
+session.query(<<~SQL)
+  CREATE TABLE user_settings (
+    user_id text PRIMARY KEY,
+    preferences map<text, text>,
+    scores map<text, int>,
+    metadata map<text, text>,
+    counters map<text, double>
+  )
+SQL
+
+# Insert data using Ruby Hash objects - automatic conversion to Cassandra maps
+prepared = session.prepare("INSERT INTO user_settings (user_id, preferences, scores, metadata) VALUES (?, ?, ?, ?)")
+
+# Bind Hashes directly - automatic conversion to Cassandra maps
+statement = prepared.bind([
+  "user123",
+  {"theme" => "dark", "language" => "en", "notifications" => "enabled"},  # map<text, text>
+  {"level" => 15, "experience" => 2500, "achievements" => 42},           # map<text, int>
+  {"created_at" => "2024-01-15", "last_login" => "2024-06-08", "source" => "mobile"}  # map<text, text>
+])
+session.execute(statement)
+
+# Alternative: bind by index explicitly
+statement = prepared.bind
+statement.bind_by_index(0, "user456")
+statement.bind_by_index(1, {"theme" => "light", "language" => "es"})              # Hash of strings
+statement.bind_by_index(2, {"level" => 8, "experience" => 1200})                 # Hash with int values
+statement.bind_by_index(3, {"platform" => "web", "browser" => "chrome"})         # Hash of strings
+session.execute(statement)
+
+# Bind by name instead of index
+prepared_named = session.prepare("INSERT INTO user_settings (user_id, preferences, scores) VALUES (:id, :prefs, :scores)")
+statement = prepared_named.bind
+statement.bind_by_name("id", "user789")
+statement.bind_by_name("prefs", {"theme" => "auto", "sidebar" => "collapsed"})
+statement.bind_by_name("scores", {"quiz_score" => 85, "game_level" => 12})
+session.execute(statement)
+
+# Query data - results come back as Ruby Hash objects
+result = session.query("SELECT user_id, preferences, scores, metadata FROM user_settings")
+result.each do |row|
+  user_id = row[0]
+  preferences = row[1]     # Ruby Hash
+  scores = row[2]          # Ruby Hash
+  metadata = row[3]        # Ruby Hash
+  
+  puts "User: #{user_id}"
+  puts "  Preferences: #{preferences.inspect} (#{preferences.class})"   # Hash
+  puts "  Scores: #{scores.to_a.map { |k,v| "#{k}: #{v}" }.join(', ')}"
+  puts "  Metadata: #{metadata.to_a.join(', ')}" if metadata
+  puts
+end
+
+# Work with retrieved maps using standard Ruby Hash methods
+result = session.query("SELECT preferences, scores FROM user_settings WHERE user_id = 'user123'")
+row = result.to_a.first
+preferences, scores = row
+
+# Standard Ruby Hash operations work seamlessly
+puts "Theme setting: #{preferences['theme']}"
+puts "Preference count: #{preferences.size}"
+puts "Has notifications: #{preferences.key?('notifications')}"
+puts "All preferences: #{preferences.keys.join(', ')}"
+puts "High scores: #{scores.select { |k, v| v > 20 }.to_a}"
+
+# Map key-value access patterns
+preferences.each do |setting, value|
+  puts "#{setting}: #{value}"
+end
+
+# Handle empty maps
+statement = prepared.bind
+statement.bind_by_index(0, "empty_user")
+statement.bind_by_index(1, {})                  # Empty map
+statement.bind_by_index(2, {})                  # Empty map
+statement.bind_by_index(3, {})                  # Empty map
+session.execute(statement)
+
+# Query empty maps - may return nil or empty Hash depending on Cassandra storage
+result = session.query("SELECT preferences, scores FROM user_settings WHERE user_id = 'empty_user'")
+row = result.to_a.first
+preferences, scores = row
+
+puts "Empty maps:"
+puts "  Preferences: #{preferences.inspect}"   # May be nil or {}
+puts "  Scores: #{scores.inspect}"             # May be nil or {}
+
+# Handle nil values (NULL maps)
+statement = prepared.bind
+statement.bind_by_index(0, "partial_user")
+statement.bind_by_index(1, nil)                                    # NULL map
+statement.bind_by_index(2, {"initial_score" => 0})                # Non-null map
+statement.bind_by_index(3, {"signup_date" => "2024-06-08"})       # Non-null map
+session.execute(statement)
+
+result = session.query("SELECT preferences, scores, metadata FROM user_settings WHERE user_id = 'partial_user'")
+row = result.to_a.first
+preferences, scores, metadata = row
+
+puts "Null handling:"
+puts "  Preferences: #{preferences.inspect}"   # nil
+puts "  Scores: #{scores.inspect}"             # {"initial_score" => 0}
+puts "  Metadata: #{metadata.inspect}"         # {"signup_date" => "2024-06-08"}
+
+# Update maps using CQL map operations
+session.query("UPDATE user_settings SET preferences = preferences + {'new_feature': 'enabled'} WHERE user_id = 'user123'")
+session.query("UPDATE user_settings SET scores = scores + {'bonus_points': 100} WHERE user_id = 'user123'")
+session.query("UPDATE user_settings SET preferences = preferences - {'notifications'} WHERE user_id = 'user123'")
+
+# Query updated data
+result = session.query("SELECT preferences, scores FROM user_settings WHERE user_id = 'user123'")
+row = result.to_a.first
+updated_preferences, updated_scores = row
+
+puts "After updates:"
+puts "  Preferences: #{updated_preferences.to_a}"     # Added 'new_feature', removed 'notifications'
+puts "  Scores: #{updated_scores.to_a}"               # Added 'bonus_points'
+
+# Complex nested data structures
+complex_metadata = {
+  "config" => '{"api_key": "secret", "timeout": 30}',
+  "tags" => "tag1,tag2,tag3",
+  "custom_fields" => '["field1", "field2"]',
+  "timestamps" => "created:2024-01-01,updated:2024-06-08"
+}
+
+statement = prepared.bind
+statement.bind_by_index(0, "complex_user")
+statement.bind_by_index(1, {"ui_theme" => "custom"})
+statement.bind_by_index(2, {"complexity_score" => 95})
+statement.bind_by_index(3, complex_metadata)
+session.execute(statement)
+
+result = session.query("SELECT metadata FROM user_settings WHERE user_id = 'complex_user'")
+row = result.to_a.first
+retrieved_metadata = row[0]
+
+puts "Complex metadata:"
+retrieved_metadata.each do |key, value|
+  puts "  #{key}: #{value}"
+end
+
+# Map operations and transformations
+preferences_map = {"theme" => "dark", "language" => "en", "sidebar" => "expanded"}
+scores_map = {"level" => 25, "xp" => 5000, "coins" => 150}
+
+puts "Map operations:"
+puts "  Preference keys: #{preferences_map.keys}"
+puts "  Score values: #{scores_map.values}"
+puts "  Combined size: #{preferences_map.size + scores_map.size}"
+puts "  Has theme setting: #{preferences_map.has_key?('theme')}"
+
+# Transform map data
+score_summary = scores_map.transform_values { |v| v > 100 ? "high" : "low" }
+puts "  Score summary: #{score_summary}"
+
+# Merge maps
+combined_settings = preferences_map.merge(scores_map.transform_keys { |k| "score_#{k}" })
+puts "  Combined settings: #{combined_settings}"
+
+# Type consistency (Cassandra enforces type safety)
+good_text_map = {"key1" => "value1", "key2" => "value2"}        # All text values - works with map<text, text>
+good_int_map = {"count1" => 100, "count2" => 200}               # All integers - works with map<text, int>
+good_mixed_map = {"setting1" => "enabled", "setting2" => "off"} # All text - works with map<text, text>
+
+statement = prepared.bind
+statement.bind_by_index(0, "type_safe_user")
+statement.bind_by_index(1, good_text_map)
+statement.bind_by_index(2, good_int_map)
+statement.bind_by_index(3, good_mixed_map)
+session.execute(statement)
+
+puts "Successfully stored type-consistent maps"
+```
+
 ## Advanced Usage
 
 ### Async Operations

@@ -72,16 +72,23 @@ CassandraC supports all major Cassandra data types with seamless Ruby integratio
 - **Inet**: IP address storage (IPv4/IPv6)
 
 ### Collection Types
-- **Lists**: Plain Ruby Arrays work seamlessly with Cassandra `list<type>` columns
+- **Lists**: Ruby Arrays work seamlessly with Cassandra `list<type>` columns
+- **Sets**: Ruby Set objects work seamlessly with Cassandra `set<type>` columns  
+- **Maps**: Ruby Hash objects work seamlessly with Cassandra `map<key_type, value_type>` columns
 
 ```ruby
-# Arrays bind directly to list columns
-session.execute("INSERT INTO table (id, numbers, tags) VALUES (?, ?, ?)", 
-                [1, [1, 2, 3], ["ruby", "cassandra"]])
+require 'set'
 
-# Results come back as Ruby Arrays  
-result = session.query("SELECT numbers, tags FROM table WHERE id = 1")
-numbers, tags = result.to_a.first  # [1, 2, 3], ["ruby", "cassandra"]
+# Arrays bind directly to list columns
+session.execute("INSERT INTO table (id, numbers, tags, scores) VALUES (?, ?, ?, ?)", 
+                [1, [1, 2, 3], Set.new(["ruby", "cassandra"]), {"total" => 95}])
+
+# Results come back as Ruby Arrays, Sets, and Hashes
+result = session.query("SELECT numbers, tags, scores FROM table WHERE id = 1")
+numbers, tags, scores = result.to_a.first  
+# numbers: [1, 2, 3] (Array)
+# tags: #<Set: {"ruby", "cassandra"}> (Set)  
+# scores: {"total" => 95} (Hash)
 ```
 
 See [EXAMPLES.md](EXAMPLES.md) for comprehensive usage examples of all data types.

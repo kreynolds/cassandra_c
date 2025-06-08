@@ -130,7 +130,7 @@ This document outlines all features and improvements needed to make CassandraC a
 - [ ] **Collection Types**:
   - [x] List collections ✅
   - [x] Set collections ✅
-  - [ ] Map collections
+  - [x] Map collections ✅
   - [ ] Frozen collections
   - [ ] Nested collections
 - [ ] **User Defined Types (UDTs)**:
