@@ -2,7 +2,7 @@ name: Test Suite
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, 'feature/*' ]
   pull_request:
     branches: [ main, develop ]
 
@@ -41,12 +41,12 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential
+        sudo apt-get install -y build-essential libuv1-dev libssl-dev
         # Install Cassandra C++ driver
-        wget https://downloads.datastax.com/cpp-driver/ubuntu/20.04/cassandra/v2.16.2/cassandra-cpp-driver_2.16.2-1_amd64.deb
-        wget https://downloads.datastax.com/cpp-driver/ubuntu/20.04/cassandra/v2.16.2/cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
-        sudo dpkg -i cassandra-cpp-driver_2.16.2-1_amd64.deb
-        sudo dpkg -i cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
+        wget -q https://downloads.datastax.com/cpp-driver/ubuntu/22.04/cassandra/v2.16.2/cassandra-cpp-driver_2.16.2-1_amd64.deb
+        wget -q https://downloads.datastax.com/cpp-driver/ubuntu/22.04/cassandra/v2.16.2/cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
+        sudo dpkg -i cassandra-cpp-driver_2.16.2-1_amd64.deb cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
+        sudo apt-get install -f -y
 
     - name: Install Ruby dependencies
       run: |
@@ -55,7 +55,19 @@ jobs:
 
     - name: Wait for Cassandra to be ready
       run: |
-        timeout 300 bash -c 'until cqlsh -e "describe cluster" 127.0.0.1 9042; do sleep 5; done'
+        echo "Waiting for Cassandra to start..."
+        for i in {1..30}; do
+          if timeout 10 bash -c "</dev/tcp/127.0.0.1/9042" 2>/dev/null; then
+            echo "Cassandra port is open, waiting for service..."
+            sleep 10
+            if docker exec $(docker ps -q --filter "ancestor=cassandra:4.1") cqlsh -e "SELECT now() FROM system.local;" 2>/dev/null; then
+              echo "Cassandra is ready!"
+              break
+            fi
+          fi
+          echo "Attempt $i: Cassandra not ready, waiting 10 seconds..."
+          sleep 10
+        done
 
     - name: Compile extension
       run: bundle exec rake compile
@@ -96,12 +108,12 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential
+        sudo apt-get install -y build-essential libuv1-dev libssl-dev
         # Install Cassandra C++ driver
-        wget https://downloads.datastax.com/cpp-driver/ubuntu/20.04/cassandra/v2.16.2/cassandra-cpp-driver_2.16.2-1_amd64.deb
-        wget https://downloads.datastax.com/cpp-driver/ubuntu/20.04/cassandra/v2.16.2/cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
-        sudo dpkg -i cassandra-cpp-driver_2.16.2-1_amd64.deb
-        sudo dpkg -i cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
+        wget -q https://downloads.datastax.com/cpp-driver/ubuntu/22.04/cassandra/v2.16.2/cassandra-cpp-driver_2.16.2-1_amd64.deb
+        wget -q https://downloads.datastax.com/cpp-driver/ubuntu/22.04/cassandra/v2.16.2/cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
+        sudo dpkg -i cassandra-cpp-driver_2.16.2-1_amd64.deb cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
+        sudo apt-get install -f -y
 
     - name: Install Ruby dependencies
       run: |
@@ -110,7 +122,19 @@ jobs:
 
     - name: Wait for Cassandra to be ready
       run: |
-        timeout 300 bash -c 'until cqlsh -e "describe cluster" 127.0.0.1 9042; do sleep 5; done'
+        echo "Waiting for Cassandra to start..."
+        for i in {1..30}; do
+          if timeout 10 bash -c "</dev/tcp/127.0.0.1/9042" 2>/dev/null; then
+            echo "Cassandra port is open, waiting for service..."
+            sleep 10
+            if docker exec $(docker ps -q --filter "ancestor=cassandra:4.1") cqlsh -e "SELECT now() FROM system.local;" 2>/dev/null; then
+              echo "Cassandra is ready!"
+              break
+            fi
+          fi
+          echo "Attempt $i: Cassandra not ready, waiting 10 seconds..."
+          sleep 10
+        done
 
     - name: Compile extension
       run: bundle exec rake compile
