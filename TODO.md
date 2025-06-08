@@ -128,7 +128,7 @@ This document outlines all features and improvements needed to make CassandraC a
     - [x] Proper counter table schema requirements (non-counter columns in primary key)
   - [ ] Duration type
 - [ ] **Collection Types**:
-  - [ ] List collections
+  - [x] List collections
   - [ ] Set collections
   - [ ] Map collections
   - [ ] Frozen collections

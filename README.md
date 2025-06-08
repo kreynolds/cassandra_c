@@ -55,6 +55,34 @@ result = session.query("SELECT * FROM system_schema.tables")
 session.close
 ```
 
+## Supported Data Types
+
+CassandraC supports all major Cassandra data types with seamless Ruby integration:
+
+### Scalar Types
+- **Text/VARCHAR/ASCII**: Regular Ruby strings with UTF-8 and ASCII validation
+- **Integers**: TinyInt, SmallInt, Int, BigInt, VarInt with overflow handling
+- **Floating Point**: Float, Double, Decimal with precision control
+- **Boolean**: Ruby true/false values
+- **UUID/TimeUUID**: Typed UUID objects with generation and time extraction
+- **Blob**: Binary data with proper encoding
+- **Inet**: IP address storage (IPv4/IPv6)
+
+### Collection Types
+- **Lists**: Plain Ruby Arrays work seamlessly with Cassandra `list<type>` columns
+
+```ruby
+# Arrays bind directly to list columns
+session.execute("INSERT INTO table (id, numbers, tags) VALUES (?, ?, ?)", 
+                [1, [1, 2, 3], ["ruby", "cassandra"]])
+
+# Results come back as Ruby Arrays  
+result = session.query("SELECT numbers, tags FROM table WHERE id = 1")
+numbers, tags = result.to_a.first  # [1, 2, 3], ["ruby", "cassandra"]
+```
+
+See [EXAMPLES.md](EXAMPLES.md) for comprehensive usage examples of all data types.
+
 ### Load Balancing Policies
 
 CassandraC supports different load balancing policies to control how queries are distributed to nodes in a Cassandra cluster.

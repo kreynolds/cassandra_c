@@ -652,6 +652,136 @@ puts "  1000 UUIDs: #{(uuid_time * 1000).round(2)}ms"
 puts "  1000 TimeUUIDs: #{(timeuuid_time * 1000).round(2)}ms"
 ```
 
+### Array Collections (Lists)
+
+```ruby
+# Create table with list columns for different data types
+session.query(<<~SQL)
+  CREATE TABLE user_data (
+    user_id text PRIMARY KEY,
+    favorite_numbers list<int>,
+    tags list<text>,
+    scores list<double>,
+    login_dates list<timestamp>
+  )
+SQL
+
+# Insert data using plain Ruby arrays - no wrapper classes needed
+prepared = session.prepare("INSERT INTO user_data (user_id, favorite_numbers, tags, scores) VALUES (?, ?, ?, ?)")
+
+# Bind arrays directly - automatic conversion to Cassandra lists
+statement = prepared.bind([
+  "user123",
+  [1, 7, 42, 100],                           # list<int>
+  ["ruby", "cassandra", "database"],         # list<text> 
+  [95.5, 87.2, 99.9, 78.1]                  # list<double>
+])
+session.execute(statement)
+
+# Alternative: bind by index explicitly
+statement = prepared.bind
+statement.bind_by_index(0, "user456")
+statement.bind_by_index(1, [2, 4, 8, 16, 32])           # Array of integers
+statement.bind_by_index(2, ["admin", "power-user"])     # Array of strings
+statement.bind_by_index(3, [100.0, 85.7, 92.3])        # Array of floats
+session.execute(statement)
+
+# Bind by name instead of index
+prepared_named = session.prepare("INSERT INTO user_data (user_id, favorite_numbers, tags) VALUES (:id, :numbers, :tags)")
+statement = prepared_named.bind
+statement.bind_by_name("id", "user789")
+statement.bind_by_name("numbers", [3, 6, 9, 12])
+statement.bind_by_name("tags", ["developer", "remote"])
+session.execute(statement)
+
+# Query data - results come back as plain Ruby arrays
+result = session.query("SELECT user_id, favorite_numbers, tags, scores FROM user_data")
+result.each do |row|
+  user_id = row[0]
+  numbers = row[1]        # Plain Ruby Array
+  tags = row[2]           # Plain Ruby Array  
+  scores = row[3]         # Plain Ruby Array
+  
+  puts "User: #{user_id}"
+  puts "  Numbers: #{numbers} (#{numbers.class})"   # Array
+  puts "  Tags: #{tags.join(', ')}"
+  puts "  Scores: #{scores.map(&:round).join(', ')}" if scores
+  puts
+end
+
+# Work with retrieved arrays using standard Ruby array methods
+result = session.query("SELECT favorite_numbers, tags FROM user_data WHERE user_id = 'user123'")
+row = result.to_a.first
+numbers, tags = row
+
+# Standard Ruby array operations work seamlessly
+puts "First number: #{numbers.first}"
+puts "Last tag: #{tags.last}"
+puts "Number count: #{numbers.length}"
+puts "Has 'ruby' tag: #{tags.include?('ruby')}"
+puts "Numbers > 10: #{numbers.select { |n| n > 10 }}"
+
+# Handle empty arrays
+statement = prepared.bind
+statement.bind_by_index(0, "empty_user")
+statement.bind_by_index(1, [])              # Empty integer list
+statement.bind_by_index(2, [])              # Empty string list  
+statement.bind_by_index(3, [])              # Empty double list
+session.execute(statement)
+
+# Query empty arrays - may return nil or empty array depending on Cassandra storage
+result = session.query("SELECT favorite_numbers, tags FROM user_data WHERE user_id = 'empty_user'")
+row = result.to_a.first
+numbers, tags = row
+
+puts "Empty arrays:"
+puts "  Numbers: #{numbers.inspect}"  # May be nil or []
+puts "  Tags: #{tags.inspect}"        # May be nil or []
+
+# Handle nil values (NULL lists)
+statement = prepared.bind
+statement.bind_by_index(0, "null_user")
+statement.bind_by_index(1, nil)             # NULL list
+statement.bind_by_index(2, ["single-tag"]) # Non-null list
+statement.bind_by_index(3, nil)             # NULL list
+session.execute(statement)
+
+result = session.query("SELECT favorite_numbers, tags FROM user_data WHERE user_id = 'null_user'")
+row = result.to_a.first
+numbers, tags = row
+
+puts "Null handling:"
+puts "  Numbers: #{numbers.inspect}"  # nil
+puts "  Tags: #{tags.inspect}"        # ["single-tag"]
+
+# Update arrays using CQL array operations
+session.query("UPDATE user_data SET tags = tags + ['new-feature'] WHERE user_id = 'user123'")
+session.query("UPDATE user_data SET favorite_numbers = [999] + favorite_numbers WHERE user_id = 'user123'")
+
+# Query updated data
+result = session.query("SELECT favorite_numbers, tags FROM user_data WHERE user_id = 'user123'")
+row = result.to_a.first
+updated_numbers, updated_tags = row
+
+puts "After updates:"
+puts "  Numbers: #{updated_numbers}"  # [999, 1, 7, 42, 100]
+puts "  Tags: #{updated_tags}"        # ["ruby", "cassandra", "database", "new-feature"]
+
+# Array type consistency (Cassandra enforces type safety)
+good_integers = [1, 2, 3, 4, 5]               # All integers - works with list<int>
+good_strings = ["tag1", "tag2", "tag3"]       # All strings - works with list<text>
+good_doubles = [1.1, 2.2, 3.3, 4.4]          # All doubles - works with list<double>
+
+statement = prepared.bind
+statement.bind_by_index(0, "type_safe_user")
+statement.bind_by_index(1, good_integers)
+statement.bind_by_index(2, good_strings)
+statement.bind_by_index(3, good_doubles)
+session.execute(statement)
+
+puts "Successfully stored type-consistent arrays"
+```
+
 ## Advanced Usage
 
 ### Async Operations

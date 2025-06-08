@@ -119,6 +119,8 @@ CassError ruby_value_to_cass_uuid(CassStatement* statement, size_t index, VALUE 
 CassError ruby_value_to_cass_uuid_by_name(CassStatement* statement, const char* name, VALUE rb_value);
 CassError ruby_value_to_cass_timeuuid(CassStatement* statement, size_t index, VALUE rb_value);
 CassError ruby_value_to_cass_timeuuid_by_name(CassStatement* statement, const char* name, VALUE rb_value);
+CassError ruby_value_to_cass_list(CassStatement* statement, size_t index, VALUE rb_value);
+CassError ruby_value_to_cass_list_by_name(CassStatement* statement, const char* name, VALUE rb_value);
 
 // ============================================================================
 // Module Initialization Functions
