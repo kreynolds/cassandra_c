@@ -122,4 +122,49 @@ The C extension uses Ruby's typed data to properly manage memory and ensure reso
 ### Feature Development Process
 - When starting a feature session, ensure that main is up to date, then check out a new branch, do the work, then open a PR once everything is done.
 
-[Rest of the document remains the same as the original content...]
+### Complete Feature Implementation Workflow
+**ALWAYS** follow this complete checklist for feature implementation:
+
+1. **Implementation Phase**
+   - Research existing patterns and implementations
+   - Implement the feature in C extension and/or Ruby code
+   - Add function declarations to headers as needed
+
+2. **Testing Phase** 
+   - Create comprehensive test suite covering the feature
+   - **Review tests for duplication and debugging artifacts**
+   - Remove excessive comments, verbose explanations, and debugging code
+   - Ensure tests are focused, clean, and maintainable
+   - Run full test suite to ensure no regressions
+
+3. **Documentation Phase**
+   - Update TODO.md to mark completed features
+   - Add comprehensive examples to EXAMPLES.md
+   - Update any relevant documentation files
+   - Review documentation for clarity and completeness
+
+4. **Quality Assurance Phase**
+   - Run linting and code quality checks (`bundle exec rake standard`)
+   - Run complete build process (`bundle exec rake`)
+   - Fix any linting or compilation issues
+
+5. **Git Workflow Phase**
+   - Stage and commit changes with descriptive commit message
+   - Push branch to remote repository
+   - **ALWAYS create a pull request using `gh pr create`**
+   - Include comprehensive PR description with summary and test plan
+
+### Documentation Update Requirements
+For any new feature, ALWAYS update:
+- **TODO.md**: Mark feature as complete with ✅
+- **EXAMPLES.md**: Add comprehensive usage examples
+- **Test coverage**: Ensure clean, focused tests without debugging artifacts
+- **Any relevant documentation**: README, architecture docs, etc.
+
+### Test Quality Standards
+- Remove excessive comments that explain obvious behavior
+- Eliminate verbose debugging output and temporary code
+- Consolidate redundant test cases
+- Use concise Ruby idioms (e.g., `&:to_i` instead of verbose blocks)
+- Focus on essential test scenarios without over-testing edge cases
+- Ensure tests are maintainable and easy to understand

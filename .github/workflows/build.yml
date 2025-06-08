@@ -1,0 +1,53 @@
+name: Build Check
+
+on:
+  push:
+    branches: [ '*' ]
+  pull_request:
+    branches: [ '*' ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        ruby-version: ['3.1', '3.3']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Ruby ${{ matrix.ruby-version }}
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby-version }}
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libuv1-dev libssl-dev cmake
+        # Try to install from Ubuntu repos first, then build from source if needed
+        if ! sudo apt-get install -y libcassandra2 libcassandra-dev 2>/dev/null; then
+          echo "Package not available, building from source..."
+          # Build DataStax C++ driver from source
+          git clone https://github.com/datastax/cpp-driver.git
+          cd cpp-driver
+          mkdir build
+          cd build
+          cmake ..
+          make -j$(nproc)
+          sudo make install
+          sudo ldconfig
+          cd ../..
+        fi
+
+    - name: Install Ruby dependencies
+      run: |
+        gem install bundler
+        bundle install
+
+    - name: Compile extension
+      run: bundle exec rake compile
+
+    - name: Run linting
+      run: bundle exec rake standard

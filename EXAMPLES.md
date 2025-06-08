@@ -782,6 +782,186 @@ session.execute(statement)
 puts "Successfully stored type-consistent arrays"
 ```
 
+### Set Collections
+
+```ruby
+require 'set'
+
+# Create table with set columns for different data types
+session.query(<<~SQL)
+  CREATE TABLE user_preferences (
+    user_id text PRIMARY KEY,
+    favorite_genres set<text>,
+    lucky_numbers set<int>,
+    visited_countries set<text>,
+    skill_ratings set<double>
+  )
+SQL
+
+# Insert data using Ruby Set objects - automatic conversion to Cassandra sets
+prepared = session.prepare("INSERT INTO user_preferences (user_id, favorite_genres, lucky_numbers, visited_countries) VALUES (?, ?, ?, ?)")
+
+# Bind Sets directly - automatic conversion to Cassandra sets
+statement = prepared.bind([
+  "user123",
+  Set.new(["rock", "jazz", "classical"]),        # set<text>
+  Set.new([7, 13, 42]),                         # set<int>
+  Set.new(["USA", "Canada", "Japan"])           # set<text>
+])
+session.execute(statement)
+
+# Alternative: bind by index explicitly
+statement = prepared.bind
+statement.bind_by_index(0, "user456")
+statement.bind_by_index(1, Set.new(["pop", "electronic"]))     # Set of strings
+statement.bind_by_index(2, Set.new([1, 8, 15, 22]))           # Set of integers
+statement.bind_by_index(3, Set.new(["UK", "France", "Germany"])) # Set of strings
+session.execute(statement)
+
+# Bind by name instead of index
+prepared_named = session.prepare("INSERT INTO user_preferences (user_id, favorite_genres, lucky_numbers) VALUES (:id, :genres, :numbers)")
+statement = prepared_named.bind
+statement.bind_by_name("id", "user789")
+statement.bind_by_name("genres", Set.new(["blues", "country"]))
+statement.bind_by_name("numbers", Set.new([3, 9, 27]))
+session.execute(statement)
+
+# Query data - results come back as Ruby Set objects
+result = session.query("SELECT user_id, favorite_genres, lucky_numbers, visited_countries FROM user_preferences")
+result.each do |row|
+  user_id = row[0]
+  genres = row[1]          # Ruby Set
+  numbers = row[2]         # Ruby Set
+  countries = row[3]       # Ruby Set
+  
+  puts "User: #{user_id}"
+  puts "  Genres: #{genres.to_a.join(', ')} (#{genres.class})"   # Set
+  puts "  Numbers: #{numbers.to_a.sort.join(', ')}"
+  puts "  Countries: #{countries.to_a.join(', ')}" if countries
+  puts
+end
+
+# Work with retrieved sets using standard Ruby Set methods
+result = session.query("SELECT favorite_genres, lucky_numbers FROM user_preferences WHERE user_id = 'user123'")
+row = result.to_a.first
+genres, numbers = row
+
+# Standard Ruby Set operations work seamlessly
+puts "First genre: #{genres.first}"
+puts "Genre count: #{genres.size}"
+puts "Has 'rock': #{genres.include?('rock')}"
+puts "Numbers > 10: #{numbers.select { |n| n > 10 }.to_a}"
+
+# Set uniqueness - duplicates are automatically removed
+duplicate_set = Set.new(["red", "blue", "red", "green", "blue"])
+statement = prepared.bind
+statement.bind_by_index(0, "duplicate_user")
+statement.bind_by_index(1, duplicate_set)  # Will store only unique values
+statement.bind_by_index(2, Set.new([1, 1, 2, 2, 3]))  # Only [1, 2, 3] stored
+statement.bind_by_index(3, Set.new(["Spain"]))
+session.execute(statement)
+
+result = session.query("SELECT favorite_genres, lucky_numbers FROM user_preferences WHERE user_id = 'duplicate_user'")
+row = result.to_a.first
+unique_genres, unique_numbers = row
+
+puts "Set uniqueness:"
+puts "  Original: #{duplicate_set.to_a} -> Stored: #{unique_genres.to_a}"
+puts "  Numbers: #{unique_numbers.to_a.sort}"  # [1, 2, 3]
+
+# Handle empty sets
+statement = prepared.bind
+statement.bind_by_index(0, "empty_user")
+statement.bind_by_index(1, Set.new)             # Empty set
+statement.bind_by_index(2, Set.new)             # Empty set
+statement.bind_by_index(3, Set.new)             # Empty set
+session.execute(statement)
+
+# Query empty sets - may return nil or empty Set depending on Cassandra storage
+result = session.query("SELECT favorite_genres, lucky_numbers FROM user_preferences WHERE user_id = 'empty_user'")
+row = result.to_a.first
+genres, numbers = row
+
+puts "Empty sets:"
+puts "  Genres: #{genres.inspect}"   # May be nil or #<Set: {}>
+puts "  Numbers: #{numbers.inspect}" # May be nil or #<Set: {}>
+
+# Handle nil values (NULL sets)
+statement = prepared.bind
+statement.bind_by_index(0, "null_user")
+statement.bind_by_index(1, nil)                      # NULL set
+statement.bind_by_index(2, Set.new([42]))            # Non-null set
+statement.bind_by_index(3, nil)                      # NULL set
+session.execute(statement)
+
+result = session.query("SELECT favorite_genres, lucky_numbers FROM user_preferences WHERE user_id = 'null_user'")
+row = result.to_a.first
+genres, numbers = row
+
+puts "Null handling:"
+puts "  Genres: #{genres.inspect}"   # nil
+puts "  Numbers: #{numbers.inspect}" # #<Set: {42}>
+
+# Arrays can be inserted into Set columns (Cassandra auto-converts)
+# But they're treated as Lists in the binding, then converted to Sets by Cassandra
+array_data = ["rock", "jazz", "rock", "blues"]  # Contains duplicate
+statement = prepared.bind
+statement.bind_by_index(0, "array_to_set_user")
+statement.bind_by_index(1, array_data)           # Array converted to Set
+statement.bind_by_index(2, [1, 2, 1, 3, 2])     # Array with duplicates
+statement.bind_by_index(3, ["Italy", "Spain", "Italy"])
+session.execute(statement)
+
+result = session.query("SELECT favorite_genres, lucky_numbers, visited_countries FROM user_preferences WHERE user_id = 'array_to_set_user'")
+row = result.to_a.first
+converted_genres, converted_numbers, converted_countries = row
+
+puts "Array to Set conversion:"
+puts "  Original array: #{array_data}"
+puts "  Stored as Set: #{converted_genres.to_a}"  # Duplicates removed
+puts "  Numbers: #{converted_numbers.to_a.sort}"  # [1, 2, 3]
+puts "  Countries: #{converted_countries.to_a}"   # ["Italy", "Spain"]
+
+# Update sets using CQL set operations
+session.query("UPDATE user_preferences SET favorite_genres = favorite_genres + {'metal'} WHERE user_id = 'user123'")
+session.query("UPDATE user_preferences SET lucky_numbers = lucky_numbers - {13} WHERE user_id = 'user123'")
+
+# Query updated data
+result = session.query("SELECT favorite_genres, lucky_numbers FROM user_preferences WHERE user_id = 'user123'")
+row = result.to_a.first
+updated_genres, updated_numbers = row
+
+puts "After updates:"
+puts "  Genres: #{updated_genres.to_a}"    # Added 'metal'
+puts "  Numbers: #{updated_numbers.to_a}"  # Removed 13
+
+# Set operations and comparisons
+set1 = Set.new(["a", "b", "c"])
+set2 = Set.new(["b", "c", "d"])
+set3 = Set.new(["a", "b", "c"])
+
+puts "Set operations:"
+puts "  Union: #{(set1 | set2).to_a}"           # ["a", "b", "c", "d"]
+puts "  Intersection: #{(set1 & set2).to_a}"    # ["b", "c"]
+puts "  Difference: #{(set1 - set2).to_a}"      # ["a"]
+puts "  Equal sets: #{set1 == set3}"            # true
+puts "  Subset: #{Set.new(['a', 'b']).subset?(set1)}"  # true
+
+# Type consistency (Cassandra enforces type safety)
+good_strings = Set.new(["tag1", "tag2", "tag3"])     # All strings - works with set<text>
+good_integers = Set.new([1, 2, 3, 4, 5])             # All integers - works with set<int>
+good_doubles = Set.new([1.1, 2.2, 3.3, 4.4])        # All doubles - works with set<double>
+
+statement = prepared.bind
+statement.bind_by_index(0, "type_safe_user")
+statement.bind_by_index(1, good_strings)
+statement.bind_by_index(2, good_integers)
+statement.bind_by_index(3, Set.new(["Portugal"]))
+session.execute(statement)
+
+puts "Successfully stored type-consistent sets"
+```
+
 ## Advanced Usage
 
 ### Async Operations

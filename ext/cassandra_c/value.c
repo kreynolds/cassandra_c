@@ -112,6 +112,11 @@ CassError ruby_value_to_cass_statement(CassStatement* statement, size_t index, V
             }
         }
         case T_OBJECT: {
+            // Check if it's a Ruby Set object
+            VALUE set_class = rb_const_get(rb_cObject, rb_intern("Set"));
+            if (rb_obj_is_kind_of(rb_value, set_class)) {
+                return ruby_value_to_cass_set(statement, index, rb_value);
+            }
             // Check if it's a typed integer
             if (rb_respond_to(rb_value, rb_intern("cassandra_typed_integer?"))) {
                 init_type_classes();
@@ -236,6 +241,11 @@ CassError ruby_value_to_cass_statement_by_name(CassStatement* statement, const c
             }
         }
         case T_OBJECT: {
+            // Check if it's a Ruby Set object
+            VALUE set_class = rb_const_get(rb_cObject, rb_intern("Set"));
+            if (rb_obj_is_kind_of(rb_value, set_class)) {
+                return ruby_value_to_cass_set_by_name(statement, name, rb_value);
+            }
             // Check if it's a typed integer
             if (rb_respond_to(rb_value, rb_intern("cassandra_typed_integer?"))) {
                 init_type_classes();
@@ -444,6 +454,27 @@ VALUE cass_value_to_ruby(const CassValue* value) {
             
             // Return plain Ruby array
             rb_value = rb_array;
+            break;
+        }
+        case CASS_VALUE_TYPE_SET: {
+            // Create a Ruby array to hold the set elements, then convert to Set
+            VALUE rb_array = rb_ary_new();
+            
+            // Get an iterator for the collection
+            CassIterator* iterator = cass_iterator_from_collection(value);
+            
+            // Iterate through each element and convert to Ruby
+            while (cass_iterator_next(iterator)) {
+                const CassValue* element = cass_iterator_get_value(iterator);
+                VALUE rb_element = cass_value_to_ruby(element);
+                rb_ary_push(rb_array, rb_element);
+            }
+            
+            cass_iterator_free(iterator);
+            
+            // Convert array to Ruby Set
+            VALUE set_class = rb_const_get(rb_cObject, rb_intern("Set"));
+            rb_value = rb_funcall(set_class, rb_intern("new"), 1, rb_array);
             break;
         }
         // Add other data types as needed
@@ -1150,6 +1181,126 @@ CassError ruby_value_to_cass_list_by_name(CassStatement* statement, const char* 
     
     CassCollection* collection;
     CassError error = ruby_array_to_cass_collection(rb_value, &collection);
+    if (error != CASS_OK) {
+        return error;
+    }
+    
+    error = cass_statement_bind_collection_by_name(statement, name, collection);
+    cass_collection_free(collection);
+    
+    return error;
+}
+
+// Helper function to convert Ruby Set to CassCollection
+static CassError ruby_set_to_cass_collection(VALUE rb_set, CassCollection** collection) {
+    // Convert Ruby Set to Array first
+    VALUE rb_array = rb_funcall(rb_set, rb_intern("to_a"), 0);
+    
+    if (TYPE(rb_array) != T_ARRAY) {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    long array_length = RARRAY_LEN(rb_array);
+    
+    // Create a new set collection
+    *collection = cass_collection_new(CASS_COLLECTION_TYPE_SET, array_length);
+    if (*collection == NULL) {
+        return CASS_ERROR_LIB_INTERNAL_ERROR;
+    }
+    
+    // Add each element to the collection
+    for (long i = 0; i < array_length; i++) {
+        VALUE element = rb_ary_entry(rb_array, i);
+        CassError error = CASS_OK;
+        
+        if (NIL_P(element)) {
+            error = cass_collection_append_string(*collection, NULL);
+        } else {
+            switch (TYPE(element)) {
+                case T_STRING: {
+                    const char* str = RSTRING_PTR(element);
+                    size_t len = RSTRING_LEN(element);
+                    error = cass_collection_append_string_n(*collection, str, len);
+                    break;
+                }
+                case T_FIXNUM: {
+                    cass_int32_t val = (cass_int32_t)NUM2LONG(element);
+                    error = cass_collection_append_int32(*collection, val);
+                    break;
+                }
+                case T_BIGNUM: {
+                    cass_int64_t val = (cass_int64_t)NUM2LL(element);
+                    error = cass_collection_append_int64(*collection, val);
+                    break;
+                }
+                case T_FLOAT: {
+                    cass_double_t val = NUM2DBL(element);
+                    error = cass_collection_append_double(*collection, val);
+                    break;
+                }
+                case T_TRUE:
+                    error = cass_collection_append_bool(*collection, cass_true);
+                    break;
+                case T_FALSE:
+                    error = cass_collection_append_bool(*collection, cass_false);
+                    break;
+                default: {
+                    // Convert to string as fallback
+                    VALUE str_val = rb_obj_as_string(element);
+                    const char* str = RSTRING_PTR(str_val);
+                    size_t len = RSTRING_LEN(str_val);
+                    error = cass_collection_append_string_n(*collection, str, len);
+                    break;
+                }
+            }
+        }
+        
+        if (error != CASS_OK) {
+            cass_collection_free(*collection);
+            *collection = NULL;
+            return error;
+        }
+    }
+    
+    return CASS_OK;
+}
+
+CassError ruby_value_to_cass_set(CassStatement* statement, size_t index, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null(statement, index);
+    }
+    
+    // Check if it's a Ruby Set
+    VALUE set_class = rb_const_get(rb_cObject, rb_intern("Set"));
+    if (!rb_obj_is_kind_of(rb_value, set_class)) {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    CassCollection* collection;
+    CassError error = ruby_set_to_cass_collection(rb_value, &collection);
+    if (error != CASS_OK) {
+        return error;
+    }
+    
+    error = cass_statement_bind_collection(statement, index, collection);
+    cass_collection_free(collection);
+    
+    return error;
+}
+
+CassError ruby_value_to_cass_set_by_name(CassStatement* statement, const char* name, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null_by_name(statement, name);
+    }
+    
+    // Check if it's a Ruby Set
+    VALUE set_class = rb_const_get(rb_cObject, rb_intern("Set"));
+    if (!rb_obj_is_kind_of(rb_value, set_class)) {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    CassCollection* collection;
+    CassError error = ruby_set_to_cass_collection(rb_value, &collection);
     if (error != CASS_OK) {
         return error;
     }
