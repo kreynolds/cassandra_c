@@ -106,22 +106,7 @@ static VALUE rb_cluster_set_consistency(VALUE self, VALUE consistency) {
     ClusterWrapper* wrapper;
     TypedData_Get_Struct(self, ClusterWrapper, &cluster_type, wrapper);
     
-    CassConsistency consistency_value;
-    
-    if (TYPE(consistency) == T_FIXNUM) {
-        // Allow direct integer values for maximum performance
-        consistency_value = (CassConsistency)NUM2INT(consistency);
-    } else if (TYPE(consistency) == T_SYMBOL) {
-        // Fast hash lookup for symbols
-        VALUE value = rb_hash_lookup(consistency_map, consistency);
-        if (NIL_P(value)) {
-            rb_raise(rb_eArgError, "Invalid consistency level: %s", 
-                     RSTRING_PTR(rb_sym2str(consistency)));
-        }
-        consistency_value = (CassConsistency)NUM2INT(value);
-    } else {
-        rb_raise(rb_eArgError, "Consistency must be an integer or symbol");
-    }
+    CassConsistency consistency_value = ruby_value_to_consistency(consistency);
     
     CassError error = cass_cluster_set_consistency(wrapper->cluster, consistency_value);
     if (error != CASS_OK) {
