@@ -41,12 +41,21 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential libuv1-dev libssl-dev
-        # Install Cassandra C++ driver
-        wget -q https://downloads.datastax.com/cpp-driver/ubuntu/22.04/cassandra/v2.16.2/cassandra-cpp-driver_2.16.2-1_amd64.deb
-        wget -q https://downloads.datastax.com/cpp-driver/ubuntu/22.04/cassandra/v2.16.2/cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
-        sudo dpkg -i cassandra-cpp-driver_2.16.2-1_amd64.deb cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
-        sudo apt-get install -f -y
+        sudo apt-get install -y build-essential libuv1-dev libssl-dev cmake
+        # Try to install from Ubuntu repos first, then build from source if needed
+        if ! sudo apt-get install -y libcassandra2 libcassandra-dev 2>/dev/null; then
+          echo "Package not available, building from source..."
+          # Build DataStax C++ driver from source
+          git clone https://github.com/datastax/cpp-driver.git
+          cd cpp-driver
+          mkdir build
+          cd build
+          cmake ..
+          make -j$(nproc)
+          sudo make install
+          sudo ldconfig
+          cd ../..
+        fi
 
     - name: Install Ruby dependencies
       run: |
@@ -108,12 +117,21 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential libuv1-dev libssl-dev
-        # Install Cassandra C++ driver
-        wget -q https://downloads.datastax.com/cpp-driver/ubuntu/22.04/cassandra/v2.16.2/cassandra-cpp-driver_2.16.2-1_amd64.deb
-        wget -q https://downloads.datastax.com/cpp-driver/ubuntu/22.04/cassandra/v2.16.2/cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
-        sudo dpkg -i cassandra-cpp-driver_2.16.2-1_amd64.deb cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
-        sudo apt-get install -f -y
+        sudo apt-get install -y build-essential libuv1-dev libssl-dev cmake
+        # Try to install from Ubuntu repos first, then build from source if needed
+        if ! sudo apt-get install -y libcassandra2 libcassandra-dev 2>/dev/null; then
+          echo "Package not available, building from source..."
+          # Build DataStax C++ driver from source
+          git clone https://github.com/datastax/cpp-driver.git
+          cd cpp-driver
+          mkdir build
+          cd build
+          cmake ..
+          make -j$(nproc)
+          sudo make install
+          sudo ldconfig
+          cd ../..
+        fi
 
     - name: Install Ruby dependencies
       run: |
