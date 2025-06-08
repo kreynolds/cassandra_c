@@ -80,6 +80,38 @@ This document tracks bug fixes, issues, and "escapes" that were discovered and r
 - Explicit verification of all requested types before implementation
 - Cross-reference original requirements during feature completion review
 
+### Missing Test Tables in CI Environment  
+**Type**: Test Escape  
+**Cost**: TBD  
+**Duration**: TBD  
+**Date**: Set Collections feature development session
+
+**Issue**: 
+- CI tests failing with "table does not exist" errors for string type tests
+- Missing tables: test_text_types, test_ascii_types, test_mixed_strings
+- Test suite was incomplete - shared test_helper.rb didn't create all required tables
+- String type tests in test/native/test_string_types.rb assumed tables existed
+
+**Root Cause**:
+- Failed to verify all existing tests would continue to pass during Set collections implementation
+- test_helper.rb setup was incomplete - didn't include all tables used by existing test files
+- No validation that shared test environment covers all test requirements
+- Assumed existing test infrastructure was complete
+
+**Resolution**:
+- Add missing string type test tables to test_helper.rb setup:
+  - test_text_types (id text PRIMARY KEY, text_col text, varchar_col varchar)
+  - test_ascii_types (id text PRIMARY KEY, ascii_col ascii) 
+  - test_mixed_strings (id text PRIMARY KEY, text_col text, ascii_col ascii, varchar_col varchar)
+- Update CI to use complete shared test environment
+- Verify all existing tests pass before feature completion
+
+**Prevention**:
+- Run full test suite immediately after any feature implementation
+- Audit test_helper.rb to ensure it creates all tables used across all test files
+- Add test environment validation step to feature development workflow
+- Include "verify existing tests still pass" as mandatory step in CLAUDE.md workflow
+
 ## Escape Analysis
 
 ### Cost Impact
