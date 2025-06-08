@@ -82,7 +82,7 @@ jobs:
       run: bundle exec rake compile
 
     - name: Run tests
-      run: bundle exec rake test
+      run: COVERAGE= bundle exec rake test
 
     - name: Run linting
       run: bundle exec rake standard
@@ -154,13 +154,8 @@ jobs:
           sleep 10
         done
 
-    - name: Compile extension
-      run: bundle exec rake compile
-
-    - name: Run tests with coverage
-      run: COVERAGE=true bundle exec rake test
-      env:
-        COVERAGE: true
+    - name: Run CI workflow (compile, test with coverage, lint)
+      run: bundle exec rake ci
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
