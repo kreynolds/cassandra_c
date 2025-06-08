@@ -111,6 +111,10 @@ CassError ruby_value_to_cass_statement(CassStatement* statement, size_t index, V
                 }
             }
         }
+        case T_HASH: {
+            // Handle Ruby Hash as map
+            return ruby_value_to_cass_map(statement, index, rb_value);
+        }
         case T_OBJECT: {
             // Check if it's a Ruby Set object
             VALUE set_class = rb_const_get(rb_cObject, rb_intern("Set"));
@@ -240,6 +244,10 @@ CassError ruby_value_to_cass_statement_by_name(CassStatement* statement, const c
                 }
             }
         }
+        case T_HASH: {
+            // Handle Ruby Hash as map
+            return ruby_value_to_cass_map_by_name(statement, name, rb_value);
+        }
         case T_OBJECT: {
             // Check if it's a Ruby Set object
             VALUE set_class = rb_const_get(rb_cObject, rb_intern("Set"));
@@ -313,6 +321,7 @@ VALUE cass_value_to_ruby(const CassValue* value) {
             size_t text_length;
             cass_value_get_string(value, &text, &text_length);
             rb_value = rb_str_new(text, text_length);
+            rb_enc_associate(rb_value, rb_utf8_encoding());
             break;
         }
         case CASS_VALUE_TYPE_TINY_INT: {
@@ -475,6 +484,28 @@ VALUE cass_value_to_ruby(const CassValue* value) {
             // Convert array to Ruby Set
             VALUE set_class = rb_const_get(rb_cObject, rb_intern("Set"));
             rb_value = rb_funcall(set_class, rb_intern("new"), 1, rb_array);
+            break;
+        }
+        case CASS_VALUE_TYPE_MAP: {
+            // Create a Ruby hash to hold the map elements
+            VALUE rb_hash = rb_hash_new();
+            
+            // Get an iterator for the map
+            CassIterator* iterator = cass_iterator_from_map(value);
+            
+            // Iterate through each key-value pair and convert to Ruby
+            while (cass_iterator_next(iterator)) {
+                const CassValue* key = cass_iterator_get_map_key(iterator);
+                const CassValue* val = cass_iterator_get_map_value(iterator);
+                VALUE rb_key = cass_value_to_ruby(key);
+                VALUE rb_val = cass_value_to_ruby(val);
+                rb_hash_aset(rb_hash, rb_key, rb_val);
+            }
+            
+            cass_iterator_free(iterator);
+            
+            // Return Ruby hash
+            rb_value = rb_hash;
             break;
         }
         // Add other data types as needed
@@ -1301,6 +1332,176 @@ CassError ruby_value_to_cass_set_by_name(CassStatement* statement, const char* n
     
     CassCollection* collection;
     CassError error = ruby_set_to_cass_collection(rb_value, &collection);
+    if (error != CASS_OK) {
+        return error;
+    }
+    
+    error = cass_statement_bind_collection_by_name(statement, name, collection);
+    cass_collection_free(collection);
+    
+    return error;
+}
+
+// Helper function to convert Ruby Hash to CassCollection
+static CassError ruby_hash_to_cass_collection(VALUE rb_hash, CassCollection** collection) {
+    if (TYPE(rb_hash) != T_HASH) {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    long hash_size = RHASH_SIZE(rb_hash);
+    
+    // Create a new map collection
+    *collection = cass_collection_new(CASS_COLLECTION_TYPE_MAP, hash_size);
+    if (*collection == NULL) {
+        return CASS_ERROR_LIB_INTERNAL_ERROR;
+    }
+    
+    // Get keys and values arrays
+    VALUE keys = rb_funcall(rb_hash, rb_intern("keys"), 0);
+    VALUE values = rb_funcall(rb_hash, rb_intern("values"), 0);
+    
+    // Add each key-value pair to the collection
+    for (long i = 0; i < hash_size; i++) {
+        VALUE key = rb_ary_entry(keys, i);
+        VALUE value = rb_ary_entry(values, i);
+        CassError error = CASS_OK;
+        
+        // Add key to collection
+        if (NIL_P(key)) {
+            error = cass_collection_append_string(*collection, NULL);
+        } else {
+            switch (TYPE(key)) {
+                case T_STRING: {
+                    const char* str = RSTRING_PTR(key);
+                    size_t len = RSTRING_LEN(key);
+                    error = cass_collection_append_string_n(*collection, str, len);
+                    break;
+                }
+                case T_FIXNUM: {
+                    cass_int32_t val = (cass_int32_t)NUM2LONG(key);
+                    error = cass_collection_append_int32(*collection, val);
+                    break;
+                }
+                case T_BIGNUM: {
+                    cass_int64_t val = (cass_int64_t)NUM2LL(key);
+                    error = cass_collection_append_int64(*collection, val);
+                    break;
+                }
+                case T_FLOAT: {
+                    cass_double_t val = NUM2DBL(key);
+                    error = cass_collection_append_double(*collection, val);
+                    break;
+                }
+                case T_TRUE:
+                    error = cass_collection_append_bool(*collection, cass_true);
+                    break;
+                case T_FALSE:
+                    error = cass_collection_append_bool(*collection, cass_false);
+                    break;
+                default: {
+                    // Convert to string as fallback
+                    VALUE str_val = rb_obj_as_string(key);
+                    const char* str = RSTRING_PTR(str_val);
+                    size_t len = RSTRING_LEN(str_val);
+                    error = cass_collection_append_string_n(*collection, str, len);
+                    break;
+                }
+            }
+        }
+        
+        if (error != CASS_OK) {
+            cass_collection_free(*collection);
+            *collection = NULL;
+            return error;
+        }
+        
+        // Add value to collection
+        if (NIL_P(value)) {
+            error = cass_collection_append_string(*collection, NULL);
+        } else {
+            switch (TYPE(value)) {
+                case T_STRING: {
+                    const char* str = RSTRING_PTR(value);
+                    size_t len = RSTRING_LEN(value);
+                    error = cass_collection_append_string_n(*collection, str, len);
+                    break;
+                }
+                case T_FIXNUM: {
+                    cass_int32_t val = (cass_int32_t)NUM2LONG(value);
+                    error = cass_collection_append_int32(*collection, val);
+                    break;
+                }
+                case T_BIGNUM: {
+                    cass_int64_t val = (cass_int64_t)NUM2LL(value);
+                    error = cass_collection_append_int64(*collection, val);
+                    break;
+                }
+                case T_FLOAT: {
+                    cass_double_t val = NUM2DBL(value);
+                    error = cass_collection_append_double(*collection, val);
+                    break;
+                }
+                case T_TRUE:
+                    error = cass_collection_append_bool(*collection, cass_true);
+                    break;
+                case T_FALSE:
+                    error = cass_collection_append_bool(*collection, cass_false);
+                    break;
+                default: {
+                    // Convert to string as fallback
+                    VALUE str_val = rb_obj_as_string(value);
+                    const char* str = RSTRING_PTR(str_val);
+                    size_t len = RSTRING_LEN(str_val);
+                    error = cass_collection_append_string_n(*collection, str, len);
+                    break;
+                }
+            }
+        }
+        
+        if (error != CASS_OK) {
+            cass_collection_free(*collection);
+            *collection = NULL;
+            return error;
+        }
+    }
+    
+    return CASS_OK;
+}
+
+CassError ruby_value_to_cass_map(CassStatement* statement, size_t index, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null(statement, index);
+    }
+    
+    // Check if it's a Ruby Hash
+    if (TYPE(rb_value) != T_HASH) {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    CassCollection* collection;
+    CassError error = ruby_hash_to_cass_collection(rb_value, &collection);
+    if (error != CASS_OK) {
+        return error;
+    }
+    
+    error = cass_statement_bind_collection(statement, index, collection);
+    cass_collection_free(collection);
+    
+    return error;
+}
+
+CassError ruby_value_to_cass_map_by_name(CassStatement* statement, const char* name, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null_by_name(statement, name);
+    }
+    
+    // Check if it's a Ruby Hash
+    if (TYPE(rb_value) != T_HASH) {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    CassCollection* collection;
+    CassError error = ruby_hash_to_cass_collection(rb_value, &collection);
     if (error != CASS_OK) {
         return error;
     }
