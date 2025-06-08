@@ -1,0 +1,129 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      cassandra:
+        image: cassandra:4.1
+        env:
+          CASSANDRA_CLUSTER_NAME: test-cluster
+          CASSANDRA_DC: datacenter1
+          CASSANDRA_RACK: rack1
+        ports:
+          - 9042:9042
+        options: >-
+          --health-cmd "cqlsh -e 'describe cluster'"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 5
+          --health-start-period 60s
+
+    strategy:
+      matrix:
+        ruby-version: ['3.0', '3.1', '3.2', '3.3']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Ruby ${{ matrix.ruby-version }}
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby-version }}
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential
+        # Install Cassandra C++ driver
+        wget https://downloads.datastax.com/cpp-driver/ubuntu/20.04/cassandra/v2.16.2/cassandra-cpp-driver_2.16.2-1_amd64.deb
+        wget https://downloads.datastax.com/cpp-driver/ubuntu/20.04/cassandra/v2.16.2/cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
+        sudo dpkg -i cassandra-cpp-driver_2.16.2-1_amd64.deb
+        sudo dpkg -i cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
+
+    - name: Install Ruby dependencies
+      run: |
+        gem install bundler
+        bundle install
+
+    - name: Wait for Cassandra to be ready
+      run: |
+        timeout 300 bash -c 'until cqlsh -e "describe cluster" 127.0.0.1 9042; do sleep 5; done'
+
+    - name: Compile extension
+      run: bundle exec rake compile
+
+    - name: Run tests
+      run: bundle exec rake test
+
+    - name: Run linting
+      run: bundle exec rake standard
+
+  test-coverage:
+    runs-on: ubuntu-latest
+    
+    services:
+      cassandra:
+        image: cassandra:4.1
+        env:
+          CASSANDRA_CLUSTER_NAME: test-cluster
+          CASSANDRA_DC: datacenter1
+          CASSANDRA_RACK: rack1
+        ports:
+          - 9042:9042
+        options: >-
+          --health-cmd "cqlsh -e 'describe cluster'"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 5
+          --health-start-period 60s
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Ruby 3.3
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.3'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential
+        # Install Cassandra C++ driver
+        wget https://downloads.datastax.com/cpp-driver/ubuntu/20.04/cassandra/v2.16.2/cassandra-cpp-driver_2.16.2-1_amd64.deb
+        wget https://downloads.datastax.com/cpp-driver/ubuntu/20.04/cassandra/v2.16.2/cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
+        sudo dpkg -i cassandra-cpp-driver_2.16.2-1_amd64.deb
+        sudo dpkg -i cassandra-cpp-driver-dev_2.16.2-1_amd64.deb
+
+    - name: Install Ruby dependencies
+      run: |
+        gem install bundler
+        bundle install
+
+    - name: Wait for Cassandra to be ready
+      run: |
+        timeout 300 bash -c 'until cqlsh -e "describe cluster" 127.0.0.1 9042; do sleep 5; done'
+
+    - name: Compile extension
+      run: bundle exec rake compile
+
+    - name: Run tests with coverage
+      run: COVERAGE=true bundle exec rake test
+      env:
+        COVERAGE: true
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
