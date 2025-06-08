@@ -88,6 +88,9 @@ extern VALUE cCassBatch;
 void raise_cassandra_error(CassError error, const char* message) __attribute__((noreturn));
 void raise_future_error(CassFuture* future, const char* prefix) __attribute__((noreturn));
 
+// Shared utility functions
+CassConsistency ruby_value_to_consistency(VALUE consistency);
+
 // Object creation functions
 VALUE future_new(CassFuture* future);
 VALUE prepared_new(const CassPrepared* prepared);

@@ -86,22 +86,7 @@ static VALUE rb_batch_set_consistency(VALUE self, VALUE consistency) {
     BatchWrapper* wrapper;
     TypedData_Get_Struct(self, BatchWrapper, &batch_type, wrapper);
 
-    CassConsistency consistency_value;
-
-    if (TYPE(consistency) == T_FIXNUM) {
-        // Allow direct integer values for maximum performance
-        consistency_value = (CassConsistency)NUM2INT(consistency);
-    } else if (TYPE(consistency) == T_SYMBOL) {
-        // Fast hash lookup for symbols - using the shared global consistency_map
-        VALUE value = rb_hash_lookup(consistency_map, consistency);
-        if (NIL_P(value)) {
-            rb_raise(rb_eArgError, "Invalid consistency level: %s", 
-                     RSTRING_PTR(rb_sym2str(consistency)));
-        }
-        consistency_value = (CassConsistency)NUM2INT(value);
-    } else {
-        rb_raise(rb_eArgError, "Consistency must be an integer or symbol");
-    }
+    CassConsistency consistency_value = ruby_value_to_consistency(consistency);
 
     CassError error = cass_batch_set_consistency(wrapper->batch, consistency_value);
     if (error != CASS_OK) {
@@ -116,20 +101,7 @@ static VALUE rb_batch_set_serial_consistency(VALUE self, VALUE serial_consistenc
     BatchWrapper* wrapper;
     TypedData_Get_Struct(self, BatchWrapper, &batch_type, wrapper);
 
-    CassConsistency consistency_value;
-
-    if (TYPE(serial_consistency) == T_FIXNUM) {
-        consistency_value = (CassConsistency)NUM2INT(serial_consistency);
-    } else if (TYPE(serial_consistency) == T_SYMBOL) {
-        VALUE value = rb_hash_lookup(consistency_map, serial_consistency);
-        if (NIL_P(value)) {
-            rb_raise(rb_eArgError, "Invalid serial consistency level: %s", 
-                     RSTRING_PTR(rb_sym2str(serial_consistency)));
-        }
-        consistency_value = (CassConsistency)NUM2INT(value);
-    } else {
-        rb_raise(rb_eArgError, "Serial consistency must be an integer or symbol");
-    }
+    CassConsistency consistency_value = ruby_value_to_consistency(serial_consistency);
 
     CassError error = cass_batch_set_serial_consistency(wrapper->batch, consistency_value);
     if (error != CASS_OK) {

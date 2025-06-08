@@ -18,6 +18,9 @@ static VALUE cDecimal = Qnil;
 static VALUE cUuid = Qnil;
 static VALUE cTimeUuid = Qnil;
 
+// Flag to track if type classes have been initialized
+static int type_classes_initialized = 0;
+
 
 // Forward declarations
 static VALUE ruby_decimal_from_varint(const cass_byte_t* varint, size_t varint_size, cass_int32_t scale);
@@ -27,7 +30,7 @@ static VALUE ruby_varint_bytes_to_integer(const cass_byte_t* varint, size_t vari
 
 // Helper function to initialize type class references
 static void init_type_classes() {
-    if (cTinyInt == Qnil) {
+    if (!type_classes_initialized) {
         VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
         VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
         cTinyInt = rb_const_get(mTypes, rb_intern("TinyInt"));
@@ -40,6 +43,7 @@ static void init_type_classes() {
         cDecimal = rb_const_get(mTypes, rb_intern("Decimal"));
         cUuid = rb_const_get(mTypes, rb_intern("Uuid"));
         cTimeUuid = rb_const_get(mTypes, rb_intern("TimeUuid"));
+        type_classes_initialized = 1;
     }
 }
 
@@ -678,9 +682,7 @@ CassError ruby_value_to_cass_float(CassStatement* statement, size_t index, VALUE
     cass_float_t float_val;
     
     // Handle CassandraC::Types::Float objects
-    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
-    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
-    VALUE cFloat = rb_const_get(mTypes, rb_intern("Float"));
+    init_type_classes();
     
     if (rb_obj_is_kind_of(rb_value, cFloat)) {
         VALUE float_value = rb_funcall(rb_value, rb_intern("to_f"), 0);
@@ -702,9 +704,7 @@ CassError ruby_value_to_cass_float_by_name(CassStatement* statement, const char*
     cass_float_t float_val;
     
     // Handle CassandraC::Types::Float objects
-    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
-    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
-    VALUE cFloat = rb_const_get(mTypes, rb_intern("Float"));
+    init_type_classes();
     
     if (rb_obj_is_kind_of(rb_value, cFloat)) {
         VALUE float_value = rb_funcall(rb_value, rb_intern("to_f"), 0);
@@ -723,14 +723,12 @@ CassError ruby_value_to_cass_double(CassStatement* statement, size_t index, VALU
     if (NIL_P(rb_value)) {
         return cass_statement_bind_null(statement, index);
     }
-    
+
     cass_double_t double_val;
-    
+
     // Handle CassandraC::Types::Double objects
-    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
-    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
-    VALUE cDouble = rb_const_get(mTypes, rb_intern("Double"));
-    
+    init_type_classes();
+
     if (rb_obj_is_kind_of(rb_value, cDouble)) {
         VALUE double_value = rb_funcall(rb_value, rb_intern("to_f"), 0);
         double_val = NUM2DBL(double_value);
@@ -739,7 +737,7 @@ CassError ruby_value_to_cass_double(CassStatement* statement, size_t index, VALU
     } else {
         return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
     }
-    
+
     return cass_statement_bind_double(statement, index, double_val);
 }
 
@@ -747,14 +745,12 @@ CassError ruby_value_to_cass_double_by_name(CassStatement* statement, const char
     if (NIL_P(rb_value)) {
         return cass_statement_bind_null_by_name(statement, name);
     }
-    
+
     cass_double_t double_val;
-    
+
     // Handle CassandraC::Types::Double objects
-    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
-    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
-    VALUE cDouble = rb_const_get(mTypes, rb_intern("Double"));
-    
+    init_type_classes();
+
     if (rb_obj_is_kind_of(rb_value, cDouble)) {
         VALUE double_value = rb_funcall(rb_value, rb_intern("to_f"), 0);
         double_val = NUM2DBL(double_value);
@@ -763,7 +759,7 @@ CassError ruby_value_to_cass_double_by_name(CassStatement* statement, const char
     } else {
         return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
     }
-    
+
     return cass_statement_bind_double_by_name(statement, name, double_val);
 }
 
@@ -931,24 +927,22 @@ CassError ruby_value_to_cass_decimal(CassStatement* statement, size_t index, VAL
     if (NIL_P(rb_value)) {
         return cass_statement_bind_null(statement, index);
     }
-    
+
     cass_int32_t scale;
-    
+
     // Handle CassandraC::Types::Decimal objects
-    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
-    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
-    VALUE cDecimal = rb_const_get(mTypes, rb_intern("Decimal"));
-    
+    init_type_classes();
+
     if (rb_obj_is_kind_of(rb_value, cDecimal)) {
         cass_byte_t* varint_bytes;
         size_t varint_size;
         ruby_decimal_to_varint_bytes(rb_value, &varint_bytes, &varint_size, &scale);
-        
+
         CassError error = cass_statement_bind_decimal(statement, index, varint_bytes, varint_size, scale);
-        
+
         // Free the allocated varint bytes
         free(varint_bytes);
-        
+
         return error;
     } else {
         // Try to create a Decimal from the value
@@ -961,24 +955,22 @@ CassError ruby_value_to_cass_decimal_by_name(CassStatement* statement, const cha
     if (NIL_P(rb_value)) {
         return cass_statement_bind_null_by_name(statement, name);
     }
-    
+
     cass_int32_t scale;
-    
+
     // Handle CassandraC::Types::Decimal objects
-    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
-    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
-    VALUE cDecimal = rb_const_get(mTypes, rb_intern("Decimal"));
-    
+    init_type_classes();
+
     if (rb_obj_is_kind_of(rb_value, cDecimal)) {
         cass_byte_t* varint_bytes;
         size_t varint_size;
         ruby_decimal_to_varint_bytes(rb_value, &varint_bytes, &varint_size, &scale);
-        
+
         CassError error = cass_statement_bind_decimal_by_name(statement, name, varint_bytes, varint_size, scale);
-        
+
         // Free the allocated varint bytes
         free(varint_bytes);
-        
+
         return error;
     } else {
         // Try to create a Decimal from the value
@@ -992,14 +984,12 @@ CassError ruby_value_to_cass_uuid(CassStatement* statement, size_t index, VALUE 
     if (NIL_P(rb_value)) {
         return cass_statement_bind_null(statement, index);
     }
-    
+
     VALUE uuid_str;
-    
+
     // Handle CassandraC::Types::Uuid objects
-    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
-    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
-    VALUE cUuid = rb_const_get(mTypes, rb_intern("Uuid"));
-    
+    init_type_classes();
+
     if (rb_obj_is_kind_of(rb_value, cUuid)) {
         uuid_str = rb_funcall(rb_value, rb_intern("to_s"), 0);
     } else if (TYPE(rb_value) == T_STRING) {
@@ -1007,14 +997,14 @@ CassError ruby_value_to_cass_uuid(CassStatement* statement, size_t index, VALUE 
     } else {
         return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
     }
-    
+
     const char* uuid_cstr = RSTRING_PTR(uuid_str);
     CassUuid uuid;
     CassError error = cass_uuid_from_string(uuid_cstr, &uuid);
     if (error != CASS_OK) {
         return error;
     }
-    
+
     return cass_statement_bind_uuid(statement, index, uuid);
 }
 
@@ -1022,14 +1012,12 @@ CassError ruby_value_to_cass_uuid_by_name(CassStatement* statement, const char* 
     if (NIL_P(rb_value)) {
         return cass_statement_bind_null_by_name(statement, name);
     }
-    
+
     VALUE uuid_str;
-    
+
     // Handle CassandraC::Types::Uuid objects
-    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
-    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
-    VALUE cUuid = rb_const_get(mTypes, rb_intern("Uuid"));
-    
+    init_type_classes();
+
     if (rb_obj_is_kind_of(rb_value, cUuid)) {
         uuid_str = rb_funcall(rb_value, rb_intern("to_s"), 0);
     } else if (TYPE(rb_value) == T_STRING) {
@@ -1037,14 +1025,14 @@ CassError ruby_value_to_cass_uuid_by_name(CassStatement* statement, const char* 
     } else {
         return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
     }
-    
+
     const char* uuid_cstr = RSTRING_PTR(uuid_str);
     CassUuid uuid;
     CassError error = cass_uuid_from_string(uuid_cstr, &uuid);
     if (error != CASS_OK) {
         return error;
     }
-    
+
     return cass_statement_bind_uuid_by_name(statement, name, uuid);
 }
 
@@ -1053,14 +1041,12 @@ CassError ruby_value_to_cass_timeuuid(CassStatement* statement, size_t index, VA
     if (NIL_P(rb_value)) {
         return cass_statement_bind_null(statement, index);
     }
-    
+
     VALUE timeuuid_str;
-    
+
     // Handle CassandraC::Types::TimeUuid objects
-    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
-    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
-    VALUE cTimeUuid = rb_const_get(mTypes, rb_intern("TimeUuid"));
-    
+    init_type_classes();
+
     if (rb_obj_is_kind_of(rb_value, cTimeUuid)) {
         timeuuid_str = rb_funcall(rb_value, rb_intern("to_s"), 0);
     } else if (TYPE(rb_value) == T_STRING) {
@@ -1068,14 +1054,14 @@ CassError ruby_value_to_cass_timeuuid(CassStatement* statement, size_t index, VA
     } else {
         return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
     }
-    
+
     const char* timeuuid_cstr = RSTRING_PTR(timeuuid_str);
     CassUuid timeuuid;
     CassError error = cass_uuid_from_string(timeuuid_cstr, &timeuuid);
     if (error != CASS_OK) {
         return error;
     }
-    
+
     return cass_statement_bind_uuid(statement, index, timeuuid);
 }
 
@@ -1083,14 +1069,12 @@ CassError ruby_value_to_cass_timeuuid_by_name(CassStatement* statement, const ch
     if (NIL_P(rb_value)) {
         return cass_statement_bind_null_by_name(statement, name);
     }
-    
+
     VALUE timeuuid_str;
-    
+
     // Handle CassandraC::Types::TimeUuid objects
-    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
-    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
-    VALUE cTimeUuid = rb_const_get(mTypes, rb_intern("TimeUuid"));
-    
+    init_type_classes();
+
     if (rb_obj_is_kind_of(rb_value, cTimeUuid)) {
         timeuuid_str = rb_funcall(rb_value, rb_intern("to_s"), 0);
     } else if (TYPE(rb_value) == T_STRING) {
@@ -1098,14 +1082,14 @@ CassError ruby_value_to_cass_timeuuid_by_name(CassStatement* statement, const ch
     } else {
         return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
     }
-    
+
     const char* timeuuid_cstr = RSTRING_PTR(timeuuid_str);
     CassUuid timeuuid;
     CassError error = cass_uuid_from_string(timeuuid_cstr, &timeuuid);
     if (error != CASS_OK) {
         return error;
     }
-    
+
     return cass_statement_bind_uuid_by_name(statement, name, timeuuid);
 }
 

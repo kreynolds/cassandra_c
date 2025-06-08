@@ -42,6 +42,24 @@ void raise_future_error(CassFuture* future, const char* prefix) {
     }
 }
 
+// Shared utility function to convert Ruby value to CassConsistency
+CassConsistency ruby_value_to_consistency(VALUE consistency) {
+    if (TYPE(consistency) == T_FIXNUM) {
+        // Allow direct integer values for maximum performance
+        return (CassConsistency)NUM2INT(consistency);
+    } else if (TYPE(consistency) == T_SYMBOL) {
+        // Fast hash lookup for symbols - using the shared global consistency_map
+        VALUE value = rb_hash_lookup(consistency_map, consistency);
+        if (NIL_P(value)) {
+            rb_raise(rb_eArgError, "Invalid consistency level: %s", 
+                     RSTRING_PTR(rb_sym2str(consistency)));
+        }
+        return (CassConsistency)NUM2INT(value);
+    } else {
+        rb_raise(rb_eArgError, "Consistency must be an integer or symbol");
+    }
+}
+
 // ============================================================================
 // Constants Definition
 // ============================================================================
