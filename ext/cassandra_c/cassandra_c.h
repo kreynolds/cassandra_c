@@ -128,6 +128,12 @@ CassError ruby_value_to_cass_set(CassStatement* statement, size_t index, VALUE r
 CassError ruby_value_to_cass_set_by_name(CassStatement* statement, const char* name, VALUE rb_value);
 CassError ruby_value_to_cass_map(CassStatement* statement, size_t index, VALUE rb_value);
 CassError ruby_value_to_cass_map_by_name(CassStatement* statement, const char* name, VALUE rb_value);
+CassError ruby_value_to_cass_date(CassStatement* statement, size_t index, VALUE rb_value);
+CassError ruby_value_to_cass_date_by_name(CassStatement* statement, const char* name, VALUE rb_value);
+CassError ruby_value_to_cass_time(CassStatement* statement, size_t index, VALUE rb_value);
+CassError ruby_value_to_cass_time_by_name(CassStatement* statement, const char* name, VALUE rb_value);
+CassError ruby_value_to_cass_timestamp(CassStatement* statement, size_t index, VALUE rb_value);
+CassError ruby_value_to_cass_timestamp_by_name(CassStatement* statement, const char* name, VALUE rb_value);
 
 // ============================================================================
 // Module Initialization Functions

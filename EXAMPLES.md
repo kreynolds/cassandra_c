@@ -434,6 +434,235 @@ special_cases.each do |server_id, original_ip|
 end
 ```
 
+### Date and Time Types
+
+CassandraC provides comprehensive support for Cassandra's date and time types with type-safe wrappers and conversion methods.
+
+**Return Behavior:**
+- **DATE** columns return native Ruby `Date` objects
+- **TIMESTAMP** columns return native Ruby `Time` objects  
+- **TIME** columns return `CassandraC::Types::Time` objects (Ruby has no time-only equivalent)
+
+```ruby
+# Create table with date/time columns
+session.query(<<~SQL)
+  CREATE TABLE events (
+    id int PRIMARY KEY,
+    event_date date,
+    event_time time,
+    created_at timestamp,
+    daily_schedule time
+  )
+SQL
+
+# Date Type Examples
+# ------------------
+
+# Create Date objects from various inputs
+date1 = CassandraC::Types::Date.new(Date.new(2023, 12, 25))    # From Ruby Date
+date2 = CassandraC::Types::Date.new("2023-12-25")             # From string
+date3 = CassandraC::Types::Date.new(19716)                    # From days since epoch
+date4 = Date.today.to_cassandra_date                          # Conversion method
+
+puts "Christmas 2023: #{date1}"                               # Output: 2023-12-25
+puts "Days since epoch: #{date1.days_since_epoch}"            # Output: 19716
+
+# Time Type Examples  
+# ------------------
+
+# Create Time objects (nanoseconds since midnight)
+time1 = CassandraC::Types::Time.new("14:30:45.123456789")     # From string with nanoseconds
+time2 = CassandraC::Types::Time.new("09:15:30")               # From string (seconds precision)
+time3 = CassandraC::Types::Time.new(52245000000000)           # From nanoseconds
+time4 = Time.now.to_cassandra_time                            # From Ruby Time (time part only)
+time5 = "23:59:59.999".to_cassandra_time                      # Conversion method
+
+puts "Afternoon time: #{time1}"                               # Output: 14:30:45.123456789
+puts "Nanoseconds: #{time1.nanoseconds_since_midnight}"       # Output: 52245123456789
+
+# Timestamp Type Examples
+# -----------------------
+
+# Create Timestamp objects (milliseconds since Unix epoch)
+timestamp1 = CassandraC::Types::Timestamp.new(Time.new(2023, 12, 25, 14, 30, 45))  # From Ruby Time
+timestamp2 = CassandraC::Types::Timestamp.new("2023-12-25 14:30:45")               # From string
+timestamp3 = CassandraC::Types::Timestamp.new(1703520645000)                       # From milliseconds
+timestamp4 = Time.now.to_cassandra_timestamp                                       # Conversion method
+timestamp5 = Date.today.to_cassandra_timestamp                                     # From Date
+
+puts "Event timestamp: #{timestamp1}"                         # Output: 2023-12-25 14:30:45 -0500
+puts "Milliseconds: #{timestamp1.milliseconds_since_epoch}"   # Output: 1703520645000
+
+# Parameter Binding Examples
+# --------------------------
+
+# Bind date/time parameters by index
+statement = CassandraC::Native::Statement.new(
+  "INSERT INTO events (id, event_date, event_time, created_at) VALUES (?, ?, ?, ?)", 4
+)
+
+statement.bind_by_index(0, 1)
+statement.bind_date_by_index(1, date1)
+statement.bind_time_by_index(2, time1)
+statement.bind_timestamp_by_index(3, timestamp1)
+session.execute(statement)
+
+# Bind date/time parameters by name
+statement_named = CassandraC::Native::Statement.new(
+  "INSERT INTO events (id, event_date, event_time, created_at) VALUES (:id, :date, :time, :timestamp)", 4
+)
+
+statement_named.bind_by_name("id", 2)
+statement_named.bind_date_by_name("date", "2024-01-01".to_cassandra_date)
+statement_named.bind_time_by_name("time", "10:30:00".to_cassandra_time)  
+statement_named.bind_timestamp_by_name("timestamp", Time.now.to_cassandra_timestamp)
+session.execute(statement_named)
+
+# Using prepared statements with date/time types
+prepared = session.prepare("INSERT INTO events (id, event_date, event_time, created_at) VALUES (?, ?, ?, ?)")
+
+# Array binding automatically handles typed values
+event_date = Date.new(2024, 6, 15).to_cassandra_date
+event_time = "16:45:30.123".to_cassandra_time
+event_timestamp = Time.now.to_cassandra_timestamp
+
+statement = prepared.bind([3, event_date, event_time, event_timestamp])
+session.execute(statement)
+
+# Date/Time Comparisons and Operations
+# ------------------------------------
+
+date_a = "2023-12-25".to_cassandra_date
+date_b = "2024-01-01".to_cassandra_date
+
+puts "Christmas before New Year: #{date_a < date_b}"          # Output: true
+puts "Dates equal: #{date_a == date_b}"                       # Output: false
+
+time_morning = "09:00:00".to_cassandra_time
+time_evening = "18:30:00".to_cassandra_time
+
+puts "Morning before evening: #{time_morning < time_evening}" # Output: true
+
+# Retrieving Date/Time Data
+# ------------------------
+
+result = session.query("SELECT id, event_date, event_time, created_at FROM events WHERE id = 1")
+row = result.first
+
+if row
+  retrieved_date = row[1]      # Returns Ruby Date object
+  retrieved_time = row[2]      # Returns CassandraC::Types::Time  
+  retrieved_timestamp = row[3] # Returns Ruby Time object
+  
+  puts "Event ID: #{row[0]}"
+  puts "Date: #{retrieved_date} (#{retrieved_date.class})"           # Date
+  puts "Time: #{retrieved_time} (#{retrieved_time.class})"           # CassandraC::Types::Time
+  puts "Timestamp: #{retrieved_timestamp} (#{retrieved_timestamp.class})" # Time
+  
+  # Native Ruby objects are returned for DATE and TIMESTAMP types
+  # Only TIME type returns a custom wrapper (no Ruby equivalent for time-only)
+  puts "Native Ruby Date: #{retrieved_date.strftime('%Y-%m-%d')}"
+  puts "Native Ruby Time: #{retrieved_timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+end
+
+# Practical Use Cases
+# -------------------
+
+# Daily schedule table
+session.query(<<~SQL)
+  CREATE TABLE daily_schedule (
+    day_of_week text PRIMARY KEY,
+    start_time time,
+    end_time time,
+    break_time time
+  )
+SQL
+
+# Insert schedule data
+schedule_data = [
+  ["monday", "09:00:00", "17:00:00", "12:00:00"],
+  ["tuesday", "09:30:00", "17:30:00", "12:30:00"],
+  ["wednesday", "08:00:00", "16:00:00", "12:00:00"]
+]
+
+schedule_data.each do |day, start_str, end_str, break_str|
+  prepared = session.prepare("INSERT INTO daily_schedule (day_of_week, start_time, end_time, break_time) VALUES (?, ?, ?, ?)")
+  
+  start_time = start_str.to_cassandra_time
+  end_time = end_str.to_cassandra_time  
+  break_time = break_str.to_cassandra_time
+  
+  statement = prepared.bind([day, start_time, end_time, break_time])
+  session.execute(statement)
+end
+
+# Query and work with time ranges
+result = session.query("SELECT * FROM daily_schedule WHERE day_of_week = 'monday'")
+monday_schedule = result.first
+
+if monday_schedule
+  start_time = monday_schedule[1]
+  end_time = monday_schedule[2]
+  break_time = monday_schedule[3]
+  
+  puts "Monday schedule:"
+  puts "  Start: #{start_time}"
+  puts "  End: #{end_time}"
+  puts "  Break: #{break_time}"
+  puts "  Work duration: #{(end_time.nanoseconds_since_midnight - start_time.nanoseconds_since_midnight) / 1_000_000_000 / 3600} hours"
+end
+
+# Event logging with precise timestamps
+session.query(<<~SQL)
+  CREATE TABLE event_log (
+    event_id timeuuid PRIMARY KEY,
+    event_date date,
+    event_timestamp timestamp,
+    event_type text,
+    description text
+  )
+SQL
+
+# Log events with current date and time
+events = [
+  ["user_login", "User logged in successfully"],
+  ["data_update", "User profile updated"],
+  ["user_logout", "User logged out"]
+]
+
+events.each do |event_type, description|
+  event_uuid = CassandraC::Types::TimeUuid.generate
+  current_time = Time.now
+  
+  prepared = session.prepare(
+    "INSERT INTO event_log (event_id, event_date, event_timestamp, event_type, description) VALUES (?, ?, ?, ?, ?)"
+  )
+  
+  statement = prepared.bind([
+    event_uuid,
+    current_time.to_cassandra_date,
+    current_time.to_cassandra_timestamp,
+    event_type,
+    description
+  ])
+  
+  session.execute(statement)
+  puts "Logged #{event_type} at #{current_time}"
+end
+
+# Query events by date range
+today = Date.today.to_cassandra_date
+result = session.query("SELECT event_timestamp, event_type, description FROM event_log WHERE event_date = #{today.days_since_epoch} ALLOW FILTERING")
+
+puts "\nToday's events:"
+result.each do |row|
+  timestamp = row[0]
+  event_type = row[1]
+  description = row[2]
+  puts "  #{timestamp}: #{event_type} - #{description}"
+end
+```
+
 ### UUID and TimeUUID Types
 
 ```ruby

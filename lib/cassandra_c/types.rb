@@ -1,5 +1,7 @@
 require "bigdecimal"
 require "securerandom"
+require "date"
+require "time"
 
 module CassandraC
   module Types
@@ -413,10 +415,10 @@ module CassandraC
               raise ArgumentError, "Invalid TimeUUID format: #{value}"
             end
             @value = value.downcase
-          when Time
+          when ::Time
             @value = self.class.from_time(value).to_s
           else
-            raise ArgumentError, "Value must be a string, Time, or nil, got #{value.class}"
+            raise ArgumentError, "Value must be a string, ::Time, or nil, got #{value.class}"
           end
         end
       end
@@ -478,7 +480,7 @@ module CassandraC
         unix_seconds = unix_time_100ns / 10_000_000
         microseconds = (unix_time_100ns % 10_000_000) / 10
 
-        Time.at(unix_seconds, microseconds)
+        ::Time.at(unix_seconds, microseconds)
       end
 
       # Marker method to identify as a TimeUUID
@@ -487,7 +489,7 @@ module CassandraC
       end
 
       # Generate a new TimeUUID for current time
-      def self.generate(timestamp = Time.now)
+      def self.generate(timestamp = ::Time.now)
         from_time(timestamp)
       end
 
@@ -523,6 +525,373 @@ module CassandraC
         # Check if it's version 1 (time-based UUID)
         version_char = str[14]
         version_char == "1"
+      end
+    end
+
+    # Date type - Cassandra DATE (days since Unix epoch)
+    class Date
+      EPOCH_DATE = ::Date.new(1970, 1, 1)
+
+      def initialize(value = nil)
+        case value
+        when nil
+          @value = ::Date.today
+        when ::Date
+          @value = value
+        when ::Time
+          @value = value.to_date
+        when Integer
+          # Days since Unix epoch
+          @value = EPOCH_DATE + value
+        when String
+          @value = ::Date.parse(value)
+        else
+          raise ArgumentError, "Value must be a Date, Time, Integer (days since epoch), String, or nil, got #{value.class}"
+        end
+      end
+
+      def to_date
+        @value
+      end
+
+      def to_s
+        @value.to_s
+      end
+
+      def inspect
+        "Date(#{@value})"
+      end
+
+      # Convert to days since Unix epoch
+      def days_since_epoch
+        (@value - EPOCH_DATE).to_i
+      end
+
+      def ==(other)
+        case other
+        when Date
+          @value == other.to_date
+        when ::Date
+          @value == other
+        else
+          false
+        end
+      end
+
+      def <=>(other)
+        case other
+        when Date
+          @value <=> other.to_date
+        when ::Date
+          @value <=> other
+        end
+      end
+
+      def hash
+        @value.hash
+      end
+
+      def eql?(other)
+        other.is_a?(Date) && @value == other.to_date
+      end
+
+      # Comparison operators
+      def <(other)
+        case other
+        when Date
+          @value < other.to_date
+        when ::Date
+          @value < other
+        end
+      end
+
+      def >(other)
+        case other
+        when Date
+          @value > other.to_date
+        when ::Date
+          @value > other
+        end
+      end
+
+      def <=(other)
+        case other
+        when Date
+          @value <= other.to_date
+        when ::Date
+          @value <= other
+        end
+      end
+
+      def >=(other)
+        case other
+        when Date
+          @value >= other.to_date
+        when ::Date
+          @value >= other
+        end
+      end
+
+      # Marker method to identify as a typed date
+      def cassandra_typed_date?
+        true
+      end
+
+      # Create from days since epoch
+      def self.from_days_since_epoch(days)
+        new(days)
+      end
+    end
+
+    # Time type - Cassandra TIME (nanoseconds since midnight)
+    class Time
+      NANOSECONDS_PER_SECOND = 1_000_000_000
+      NANOSECONDS_PER_MINUTE = NANOSECONDS_PER_SECOND * 60
+      NANOSECONDS_PER_HOUR = NANOSECONDS_PER_MINUTE * 60
+
+      def initialize(value = nil)
+        case value
+        when nil
+          ruby_time = ::Time.now
+          @nanoseconds = time_to_nanoseconds_since_midnight(ruby_time)
+        when ::Time
+          @nanoseconds = time_to_nanoseconds_since_midnight(value)
+        when Integer
+          # Nanoseconds since midnight
+          @nanoseconds = value % (24 * NANOSECONDS_PER_HOUR) # Wrap around for 24-hour day
+        when String
+          # Parse time string (e.g., "14:30:45.123456789")
+          if value =~ /\A(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?\z/
+            hours, minutes, seconds, nanos = $1.to_i, $2.to_i, $3.to_i, ($4 || "0").ljust(9, "0").to_i
+            @nanoseconds = hours * NANOSECONDS_PER_HOUR +
+              minutes * NANOSECONDS_PER_MINUTE +
+              seconds * NANOSECONDS_PER_SECOND +
+              nanos
+          else
+            raise ArgumentError, "Invalid time format: #{value}"
+          end
+        else
+          raise ArgumentError, "Value must be a Time, Integer (nanoseconds), String, or nil, got #{value.class}"
+        end
+      end
+
+      def nanoseconds_since_midnight
+        @nanoseconds
+      end
+
+      def to_s
+        hours = @nanoseconds / NANOSECONDS_PER_HOUR
+        remaining = @nanoseconds % NANOSECONDS_PER_HOUR
+        minutes = remaining / NANOSECONDS_PER_MINUTE
+        remaining %= NANOSECONDS_PER_MINUTE
+        seconds = remaining / NANOSECONDS_PER_SECOND
+        nanos = remaining % NANOSECONDS_PER_SECOND
+
+        if nanos == 0
+          sprintf("%02d:%02d:%02d", hours, minutes, seconds)
+        else
+          sprintf("%02d:%02d:%02d.%09d", hours, minutes, seconds, nanos).sub(/0+\z/, "")
+        end
+      end
+
+      def inspect
+        "Time(#{self})"
+      end
+
+      def ==(other)
+        case other
+        when Time
+          @nanoseconds == other.nanoseconds_since_midnight
+        when ::Time
+          @nanoseconds == time_to_nanoseconds_since_midnight(other)
+        else
+          false
+        end
+      end
+
+      def <=>(other)
+        case other
+        when Time
+          @nanoseconds <=> other.nanoseconds_since_midnight
+        when ::Time
+          @nanoseconds <=> time_to_nanoseconds_since_midnight(other)
+        end
+      end
+
+      def hash
+        @nanoseconds.hash
+      end
+
+      def eql?(other)
+        other.is_a?(Time) && @nanoseconds == other.nanoseconds_since_midnight
+      end
+
+      # Comparison operators
+      def <(other)
+        case other
+        when Time
+          @nanoseconds < other.nanoseconds_since_midnight
+        when ::Time
+          @nanoseconds < time_to_nanoseconds_since_midnight(other)
+        end
+      end
+
+      def >(other)
+        case other
+        when Time
+          @nanoseconds > other.nanoseconds_since_midnight
+        when ::Time
+          @nanoseconds > time_to_nanoseconds_since_midnight(other)
+        end
+      end
+
+      def <=(other)
+        case other
+        when Time
+          @nanoseconds <= other.nanoseconds_since_midnight
+        when ::Time
+          @nanoseconds <= time_to_nanoseconds_since_midnight(other)
+        end
+      end
+
+      def >=(other)
+        case other
+        when Time
+          @nanoseconds >= other.nanoseconds_since_midnight
+        when ::Time
+          @nanoseconds >= time_to_nanoseconds_since_midnight(other)
+        end
+      end
+
+      # Marker method to identify as a typed time
+      def cassandra_typed_time?
+        true
+      end
+
+      # Create from nanoseconds since midnight
+      def self.from_nanoseconds_since_midnight(nanoseconds)
+        new(nanoseconds)
+      end
+
+      private
+
+      def time_to_nanoseconds_since_midnight(time)
+        # Get the time components for the current day
+        seconds_since_midnight = time.hour * 3600 + time.min * 60 + time.sec
+        seconds_since_midnight * NANOSECONDS_PER_SECOND + time.nsec
+      end
+    end
+
+    # Timestamp type - Cassandra TIMESTAMP (milliseconds since Unix epoch)
+    class Timestamp
+      def initialize(value = nil)
+        case value
+        when nil
+          @value = ::Time.now
+        when ::Time
+          @value = value
+        when Integer
+          # Milliseconds since Unix epoch
+          @value = ::Time.at(value / 1000.0)
+        when String
+          @value = ::Time.parse(value)
+        when ::Date
+          @value = value.to_time
+        else
+          raise ArgumentError, "Value must be a Time, Integer (milliseconds), String, Date, or nil, got #{value.class}"
+        end
+      end
+
+      def to_time
+        @value
+      end
+
+      def to_s
+        @value.to_s
+      end
+
+      def inspect
+        "Timestamp(#{@value})"
+      end
+
+      # Convert to milliseconds since Unix epoch
+      def milliseconds_since_epoch
+        (@value.to_f * 1000).to_i
+      end
+
+      def ==(other)
+        case other
+        when Timestamp
+          @value == other.to_time
+        when ::Time
+          @value == other
+        else
+          false
+        end
+      end
+
+      def <=>(other)
+        case other
+        when Timestamp
+          @value <=> other.to_time
+        when ::Time
+          @value <=> other
+        end
+      end
+
+      def hash
+        @value.hash
+      end
+
+      def eql?(other)
+        other.is_a?(Timestamp) && @value == other.to_time
+      end
+
+      # Comparison operators
+      def <(other)
+        case other
+        when Timestamp
+          @value < other.to_time
+        when ::Time
+          @value < other
+        end
+      end
+
+      def >(other)
+        case other
+        when Timestamp
+          @value > other.to_time
+        when ::Time
+          @value > other
+        end
+      end
+
+      def <=(other)
+        case other
+        when Timestamp
+          @value <= other.to_time
+        when ::Time
+          @value <= other
+        end
+      end
+
+      def >=(other)
+        case other
+        when Timestamp
+          @value >= other.to_time
+        when ::Time
+          @value >= other
+        end
+      end
+
+      # Marker method to identify as a typed timestamp
+      def cassandra_typed_timestamp?
+        true
+      end
+
+      # Create from milliseconds since epoch
+      def self.from_milliseconds_since_epoch(milliseconds)
+        new(milliseconds)
       end
     end
   end
@@ -607,5 +976,58 @@ end
 class Time
   def to_cassandra_timeuuid
     CassandraC::Types::TimeUuid.new(self)
+  end
+
+  def to_cassandra_timestamp
+    CassandraC::Types::Timestamp.new(self)
+  end
+
+  def to_cassandra_time
+    CassandraC::Types::Time.new(self)
+  end
+
+  def to_cassandra_date
+    CassandraC::Types::Date.new(self)
+  end
+end
+
+# Add conversion methods to Date
+class Date
+  def to_cassandra_date
+    CassandraC::Types::Date.new(self)
+  end
+
+  def to_cassandra_timestamp
+    CassandraC::Types::Timestamp.new(self)
+  end
+end
+
+# Add conversion methods to Integer for date/time types
+class Integer
+  def to_cassandra_date
+    CassandraC::Types::Date.new(self)
+  end
+
+  def to_cassandra_time
+    CassandraC::Types::Time.new(self)
+  end
+
+  def to_cassandra_timestamp
+    CassandraC::Types::Timestamp.new(self)
+  end
+end
+
+# Add conversion methods to String for date/time types
+class String
+  def to_cassandra_date
+    CassandraC::Types::Date.new(self)
+  end
+
+  def to_cassandra_time
+    CassandraC::Types::Time.new(self)
+  end
+
+  def to_cassandra_timestamp
+    CassandraC::Types::Timestamp.new(self)
   end
 end
