@@ -70,7 +70,7 @@ puts "  • Immediate resource cleanup with RUBY_TYPED_FREE_IMMEDIATELY"
 puts "  • Reduced Ruby object allocation overhead"
 puts
 
-puts "🔀 CONCURRENCY CHARACTERISTICS"  
+puts "🔀 CONCURRENCY CHARACTERISTICS"
 puts "-" * 30
 puts "Multi-threaded operations:"
 puts "  • Thread-safe session sharing"

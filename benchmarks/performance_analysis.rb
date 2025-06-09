@@ -22,7 +22,7 @@ class PerformanceAnalyzer
     analyze_query_performance
     analyze_memory_efficiency
     analyze_concurrency_performance
-    
+
     generate_summary_report
   end
 
@@ -102,15 +102,15 @@ class PerformanceAnalyzer
     end
 
     puts "📝 INSERT Operations:"
-    puts "  CassandraC: #{(insert_c_time * 1000).round(2)}ms avg (#{(1.0/insert_c_time).round(1)} ops/sec)"
-    puts "  cassandra-driver: #{(insert_driver_time * 1000).round(2)}ms avg (#{(1.0/insert_driver_time).round(1)} ops/sec)"
-    puts "  🚀 Performance: #{(insert_driver_time/insert_c_time).round(2)}x faster"
+    puts "  CassandraC: #{(insert_c_time * 1000).round(2)}ms avg (#{(1.0 / insert_c_time).round(1)} ops/sec)"
+    puts "  cassandra-driver: #{(insert_driver_time * 1000).round(2)}ms avg (#{(1.0 / insert_driver_time).round(1)} ops/sec)"
+    puts "  🚀 Performance: #{(insert_driver_time / insert_c_time).round(2)}x faster"
     puts
 
     puts "📖 SELECT Operations:"
-    puts "  CassandraC: #{(select_c_time * 1000).round(2)}ms avg (#{(1.0/select_c_time).round(1)} ops/sec)"
-    puts "  cassandra-driver: #{(select_driver_time * 1000).round(2)}ms avg (#{(1.0/select_driver_time).round(1)} ops/sec)"
-    puts "  🚀 Performance: #{(select_driver_time/select_c_time).round(2)}x faster"
+    puts "  CassandraC: #{(select_c_time * 1000).round(2)}ms avg (#{(1.0 / select_c_time).round(1)} ops/sec)"
+    puts "  cassandra-driver: #{(select_driver_time * 1000).round(2)}ms avg (#{(1.0 / select_driver_time).round(1)} ops/sec)"
+    puts "  🚀 Performance: #{(select_driver_time / select_c_time).round(2)}x faster"
     puts
   end
 
@@ -122,7 +122,7 @@ class PerformanceAnalyzer
 
     # Test statement creation memory usage
     puts "Testing statement creation overhead..."
-    
+
     c_memory = nil
     driver_memory = nil
 
@@ -202,7 +202,7 @@ class PerformanceAnalyzer
 
       puts "  CassandraC: #{c_time.round(3)}s (#{c_throughput.round(1)} ops/sec)"
       puts "  cassandra-driver: #{driver_time.round(3)}s (#{driver_throughput.round(1)} ops/sec)"
-      puts "  🚀 Throughput advantage: #{(c_throughput/driver_throughput).round(2)}x"
+      puts "  🚀 Throughput advantage: #{(c_throughput / driver_throughput).round(2)}x"
       puts
     end
   end
@@ -210,11 +210,11 @@ class PerformanceAnalyzer
   def benchmark_operation(name, iterations: 100)
     # Warmup
     5.times { yield }
-    
+
     start_time = Time.now
     iterations.times { yield }
     total_time = Time.now - start_time
-    
+
     total_time / iterations
   end
 
@@ -224,7 +224,7 @@ class PerformanceAnalyzer
     puts
     puts "🏆 KEY FINDINGS:"
     puts "• Cluster creation: ~6,400x faster"
-    puts "• Query operations: 1.4-1.6x faster"  
+    puts "• Query operations: 1.4-1.6x faster"
     puts "• Memory efficiency: Lower allocation overhead"
     puts "• Thread safety: Excellent concurrent performance"
     puts "• Type conversions: Native C speed advantage"

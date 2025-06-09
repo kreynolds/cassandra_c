@@ -455,89 +455,78 @@ session.query(<<~SQL)
   )
 SQL
 
-# Date Type Examples
-# ------------------
+# Working with Native Ruby Objects
+# --------------------------------
 
-# Create Date objects from various inputs
-date1 = CassandraC::Types::Date.new(Date.new(2023, 12, 25))    # From Ruby Date
-date2 = CassandraC::Types::Date.new("2023-12-25")             # From string
-date3 = CassandraC::Types::Date.new(19716)                    # From days since epoch
-date4 = Date.today.to_cassandra_date                          # Conversion method
+# Use Ruby's built-in Date and Time objects directly - no wrapper classes needed!
+event_date = Date.new(2023, 12, 25)           # Native Ruby Date
+event_timestamp = Time.new(2023, 12, 25, 14, 30, 45)  # Native Ruby Time
 
-puts "Christmas 2023: #{date1}"                               # Output: 2023-12-25
-puts "Days since epoch: #{date1.days_since_epoch}"            # Output: 19716
+puts "Event date: #{event_date}"              # Output: 2023-12-25
+puts "Event timestamp: #{event_timestamp}"    # Output: 2023-12-25 14:30:45 -0500
 
-# Time Type Examples  
-# ------------------
+# TIME columns are the only exception - Ruby has no time-only type
+event_time = CassandraC::Types::Time.new("14:30:45.123456789")
+time_from_ruby = Time.now.to_cassandra_time   # Extract time part from Ruby Time
+time_from_string = "09:15:30".to_cassandra_time
 
-# Create Time objects (nanoseconds since midnight)
-time1 = CassandraC::Types::Time.new("14:30:45.123456789")     # From string with nanoseconds
-time2 = CassandraC::Types::Time.new("09:15:30")               # From string (seconds precision)
-time3 = CassandraC::Types::Time.new(52245000000000)           # From nanoseconds
-time4 = Time.now.to_cassandra_time                            # From Ruby Time (time part only)
-time5 = "23:59:59.999".to_cassandra_time                      # Conversion method
-
-puts "Afternoon time: #{time1}"                               # Output: 14:30:45.123456789
-puts "Nanoseconds: #{time1.nanoseconds_since_midnight}"       # Output: 52245123456789
-
-# Timestamp Type Examples
-# -----------------------
-
-# Create Timestamp objects (milliseconds since Unix epoch)
-timestamp1 = CassandraC::Types::Timestamp.new(Time.new(2023, 12, 25, 14, 30, 45))  # From Ruby Time
-timestamp2 = CassandraC::Types::Timestamp.new("2023-12-25 14:30:45")               # From string
-timestamp3 = CassandraC::Types::Timestamp.new(1703520645000)                       # From milliseconds
-timestamp4 = Time.now.to_cassandra_timestamp                                       # Conversion method
-timestamp5 = Date.today.to_cassandra_timestamp                                     # From Date
-
-puts "Event timestamp: #{timestamp1}"                         # Output: 2023-12-25 14:30:45 -0500
-puts "Milliseconds: #{timestamp1.milliseconds_since_epoch}"   # Output: 1703520645000
+puts "Event time: #{event_time}"              # Output: 14:30:45.123456789
+puts "Nanoseconds: #{event_time.nanoseconds_since_midnight}"  # Output: 52245123456789
 
 # Parameter Binding Examples
 # --------------------------
 
-# Bind date/time parameters by index
-statement = CassandraC::Native::Statement.new(
+# Automatic binding with Ruby objects (recommended approach)
+prepared = session.prepare("INSERT INTO events (id, event_date, event_time, created_at) VALUES (?, ?, ?, ?)")
+
+# Pass Ruby objects directly - the gem handles conversion automatically
+statement = prepared.bind([
+  1,
+  Date.new(2023, 12, 25),              # Ruby Date → Cassandra DATE
+  "14:30:45".to_cassandra_time,        # TIME wrapper (required)
+  Time.new(2023, 12, 25, 14, 30, 45)   # Ruby Time → Cassandra TIMESTAMP
+])
+session.execute(statement)
+
+# Manual binding by index
+statement2 = CassandraC::Native::Statement.new(
   "INSERT INTO events (id, event_date, event_time, created_at) VALUES (?, ?, ?, ?)", 4
 )
 
-statement.bind_by_index(0, 1)
-statement.bind_date_by_index(1, date1)
-statement.bind_time_by_index(2, time1)
-statement.bind_timestamp_by_index(3, timestamp1)
-session.execute(statement)
+statement2.bind_by_index(0, 2)
+statement2.bind_date_by_index(1, Date.new(2024, 1, 1))        # Ruby Date
+statement2.bind_time_by_index(2, "10:30:00".to_cassandra_time)
+statement2.bind_timestamp_by_index(3, Time.now)               # Ruby Time
+session.execute(statement2)
 
-# Bind date/time parameters by name
-statement_named = CassandraC::Native::Statement.new(
+# Manual binding by name
+statement3 = CassandraC::Native::Statement.new(
   "INSERT INTO events (id, event_date, event_time, created_at) VALUES (:id, :date, :time, :timestamp)", 4
 )
 
-statement_named.bind_by_name("id", 2)
-statement_named.bind_date_by_name("date", "2024-01-01".to_cassandra_date)
-statement_named.bind_time_by_name("time", "10:30:00".to_cassandra_time)  
-statement_named.bind_timestamp_by_name("timestamp", Time.now.to_cassandra_timestamp)
-session.execute(statement_named)
-
-# Using prepared statements with date/time types
-prepared = session.prepare("INSERT INTO events (id, event_date, event_time, created_at) VALUES (?, ?, ?, ?)")
-
-# Array binding automatically handles typed values
-event_date = Date.new(2024, 6, 15).to_cassandra_date
-event_time = "16:45:30.123".to_cassandra_time
-event_timestamp = Time.now.to_cassandra_timestamp
-
-statement = prepared.bind([3, event_date, event_time, event_timestamp])
-session.execute(statement)
+statement3.bind_by_name("id", 3)
+statement3.bind_date_by_name("date", Date.today)              # Ruby Date
+statement3.bind_time_by_name("time", Time.now.to_cassandra_time)
+statement3.bind_timestamp_by_name("timestamp", Time.now)      # Ruby Time
+session.execute(statement3)
 
 # Date/Time Comparisons and Operations
 # ------------------------------------
 
-date_a = "2023-12-25".to_cassandra_date
-date_b = "2024-01-01".to_cassandra_date
+# Ruby Date objects work naturally
+date_a = Date.new(2023, 12, 25)
+date_b = Date.new(2024, 1, 1)
 
 puts "Christmas before New Year: #{date_a < date_b}"          # Output: true
 puts "Dates equal: #{date_a == date_b}"                       # Output: false
 
+# Ruby Time objects work naturally
+time_a = Time.new(2023, 12, 25, 9, 0, 0)
+time_b = Time.new(2023, 12, 25, 18, 30, 0)
+
+puts "Morning before evening: #{time_a < time_b}"             # Output: true
+
+# TIME type comparisons
 time_morning = "09:00:00".to_cassandra_time
 time_evening = "18:30:00".to_cassandra_time
 

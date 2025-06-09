@@ -9,7 +9,7 @@ puts "=" * 50
 # Check if Cassandra is running
 def check_cassandra_connection
   require "socket"
-  
+
   begin
     socket = TCPSocket.new("127.0.0.1", 9042)
     socket.close
@@ -58,13 +58,12 @@ begin
   puts "Starting comprehensive performance benchmarks..."
   puts "This will take approximately 5-10 minutes to complete."
   puts ""
-  
+
   runner = BenchmarkRunner.new
   runner.run_all_benchmarks
-  
+
   puts ""
   puts "🎉 Benchmarks completed successfully!"
-  
 rescue Interrupt
   puts ""
   puts "⚠️  Benchmark interrupted by user"

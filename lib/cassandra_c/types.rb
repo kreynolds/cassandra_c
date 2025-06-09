@@ -528,120 +528,6 @@ module CassandraC
       end
     end
 
-    # Date type - Cassandra DATE (days since Unix epoch)
-    class Date
-      EPOCH_DATE = ::Date.new(1970, 1, 1)
-
-      def initialize(value = nil)
-        case value
-        when nil
-          @value = ::Date.today
-        when ::Date
-          @value = value
-        when ::Time
-          @value = value.to_date
-        when Integer
-          # Days since Unix epoch
-          @value = EPOCH_DATE + value
-        when String
-          @value = ::Date.parse(value)
-        else
-          raise ArgumentError, "Value must be a Date, Time, Integer (days since epoch), String, or nil, got #{value.class}"
-        end
-      end
-
-      def to_date
-        @value
-      end
-
-      def to_s
-        @value.to_s
-      end
-
-      def inspect
-        "Date(#{@value})"
-      end
-
-      # Convert to days since Unix epoch
-      def days_since_epoch
-        (@value - EPOCH_DATE).to_i
-      end
-
-      def ==(other)
-        case other
-        when Date
-          @value == other.to_date
-        when ::Date
-          @value == other
-        else
-          false
-        end
-      end
-
-      def <=>(other)
-        case other
-        when Date
-          @value <=> other.to_date
-        when ::Date
-          @value <=> other
-        end
-      end
-
-      def hash
-        @value.hash
-      end
-
-      def eql?(other)
-        other.is_a?(Date) && @value == other.to_date
-      end
-
-      # Comparison operators
-      def <(other)
-        case other
-        when Date
-          @value < other.to_date
-        when ::Date
-          @value < other
-        end
-      end
-
-      def >(other)
-        case other
-        when Date
-          @value > other.to_date
-        when ::Date
-          @value > other
-        end
-      end
-
-      def <=(other)
-        case other
-        when Date
-          @value <= other.to_date
-        when ::Date
-          @value <= other
-        end
-      end
-
-      def >=(other)
-        case other
-        when Date
-          @value >= other.to_date
-        when ::Date
-          @value >= other
-        end
-      end
-
-      # Marker method to identify as a typed date
-      def cassandra_typed_date?
-        true
-      end
-
-      # Create from days since epoch
-      def self.from_days_since_epoch(days)
-        new(days)
-      end
-    end
 
     # Time type - Cassandra TIME (nanoseconds since midnight)
     class Time
@@ -782,118 +668,6 @@ module CassandraC
       end
     end
 
-    # Timestamp type - Cassandra TIMESTAMP (milliseconds since Unix epoch)
-    class Timestamp
-      def initialize(value = nil)
-        case value
-        when nil
-          @value = ::Time.now
-        when ::Time
-          @value = value
-        when Integer
-          # Milliseconds since Unix epoch
-          @value = ::Time.at(value / 1000.0)
-        when String
-          @value = ::Time.parse(value)
-        when ::Date
-          @value = value.to_time
-        else
-          raise ArgumentError, "Value must be a Time, Integer (milliseconds), String, Date, or nil, got #{value.class}"
-        end
-      end
-
-      def to_time
-        @value
-      end
-
-      def to_s
-        @value.to_s
-      end
-
-      def inspect
-        "Timestamp(#{@value})"
-      end
-
-      # Convert to milliseconds since Unix epoch
-      def milliseconds_since_epoch
-        (@value.to_f * 1000).to_i
-      end
-
-      def ==(other)
-        case other
-        when Timestamp
-          @value == other.to_time
-        when ::Time
-          @value == other
-        else
-          false
-        end
-      end
-
-      def <=>(other)
-        case other
-        when Timestamp
-          @value <=> other.to_time
-        when ::Time
-          @value <=> other
-        end
-      end
-
-      def hash
-        @value.hash
-      end
-
-      def eql?(other)
-        other.is_a?(Timestamp) && @value == other.to_time
-      end
-
-      # Comparison operators
-      def <(other)
-        case other
-        when Timestamp
-          @value < other.to_time
-        when ::Time
-          @value < other
-        end
-      end
-
-      def >(other)
-        case other
-        when Timestamp
-          @value > other.to_time
-        when ::Time
-          @value > other
-        end
-      end
-
-      def <=(other)
-        case other
-        when Timestamp
-          @value <= other.to_time
-        when ::Time
-          @value <= other
-        end
-      end
-
-      def >=(other)
-        case other
-        when Timestamp
-          @value >= other.to_time
-        when ::Time
-          @value >= other
-        end
-      end
-
-      # Marker method to identify as a typed timestamp
-      def cassandra_typed_timestamp?
-        true
-      end
-
-      # Create from milliseconds since epoch
-      def self.from_milliseconds_since_epoch(milliseconds)
-        new(milliseconds)
-      end
-    end
   end
 end
 
@@ -978,56 +752,21 @@ class Time
     CassandraC::Types::TimeUuid.new(self)
   end
 
-  def to_cassandra_timestamp
-    CassandraC::Types::Timestamp.new(self)
-  end
-
   def to_cassandra_time
     CassandraC::Types::Time.new(self)
-  end
-
-  def to_cassandra_date
-    CassandraC::Types::Date.new(self)
-  end
-end
-
-# Add conversion methods to Date
-class Date
-  def to_cassandra_date
-    CassandraC::Types::Date.new(self)
-  end
-
-  def to_cassandra_timestamp
-    CassandraC::Types::Timestamp.new(self)
   end
 end
 
 # Add conversion methods to Integer for date/time types
 class Integer
-  def to_cassandra_date
-    CassandraC::Types::Date.new(self)
-  end
-
   def to_cassandra_time
     CassandraC::Types::Time.new(self)
-  end
-
-  def to_cassandra_timestamp
-    CassandraC::Types::Timestamp.new(self)
   end
 end
 
 # Add conversion methods to String for date/time types
 class String
-  def to_cassandra_date
-    CassandraC::Types::Date.new(self)
-  end
-
   def to_cassandra_time
     CassandraC::Types::Time.new(self)
-  end
-
-  def to_cassandra_timestamp
-    CassandraC::Types::Timestamp.new(self)
   end
 end

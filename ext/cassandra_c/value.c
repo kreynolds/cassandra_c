@@ -22,9 +22,7 @@ static VALUE cTimeUuid = Qnil;
 static int type_classes_initialized = 0;
 
 // Ruby classes for date/time types (will be looked up at runtime)
-static VALUE cDate = Qnil;
 static VALUE cTime = Qnil;
-static VALUE cTimestamp = Qnil;
 
 
 // Forward declarations
@@ -48,10 +46,12 @@ static void init_type_classes() {
         cDecimal = rb_const_get(mTypes, rb_intern("Decimal"));
         cUuid = rb_const_get(mTypes, rb_intern("Uuid"));
         cTimeUuid = rb_const_get(mTypes, rb_intern("TimeUuid"));
+<<<<<<< HEAD
         type_classes_initialized = 1;
         cDate = rb_const_get(mTypes, rb_intern("Date"));
+=======
+>>>>>>> 1769976 (Refactor date/time types for natural Ruby API)
         cTime = rb_const_get(mTypes, rb_intern("Time"));
-        cTimestamp = rb_const_get(mTypes, rb_intern("Timestamp"));
     }
 }
 
@@ -128,6 +128,16 @@ CassError ruby_value_to_cass_statement(CassStatement* statement, size_t index, V
             return ruby_value_to_cass_map(statement, index, rb_value);
         }
         case T_OBJECT: {
+            // Check if it's a Ruby Date object first (most common case)
+            VALUE date_class = rb_const_get(rb_cObject, rb_intern("Date"));
+            if (rb_obj_is_kind_of(rb_value, date_class)) {
+                return ruby_value_to_cass_date(statement, index, rb_value);
+            }
+            // Check if it's a Ruby Time object 
+            VALUE time_class = rb_const_get(rb_cObject, rb_intern("Time"));
+            if (rb_obj_is_kind_of(rb_value, time_class)) {
+                return ruby_value_to_cass_timestamp(statement, index, rb_value);
+            }
             // Check if it's a Ruby Set object
             VALUE set_class = rb_const_get(rb_cObject, rb_intern("Set"));
             if (rb_obj_is_kind_of(rb_value, set_class)) {
@@ -186,17 +196,9 @@ CassError ruby_value_to_cass_statement(CassStatement* statement, size_t index, V
             if (rb_respond_to(rb_value, rb_intern("cassandra_typed_timeuuid?"))) {
                 return ruby_value_to_cass_timeuuid(statement, index, rb_value);
             }
-            // Check if it's a typed Date
-            if (rb_respond_to(rb_value, rb_intern("cassandra_typed_date?"))) {
-                return ruby_value_to_cass_date(statement, index, rb_value);
-            }
             // Check if it's a typed Time
             if (rb_respond_to(rb_value, rb_intern("cassandra_typed_time?"))) {
                 return ruby_value_to_cass_time(statement, index, rb_value);
-            }
-            // Check if it's a typed Timestamp
-            if (rb_respond_to(rb_value, rb_intern("cassandra_typed_timestamp?"))) {
-                return ruby_value_to_cass_timestamp(statement, index, rb_value);
             }
             // Fall through to default case for other objects
         }
@@ -273,6 +275,16 @@ CassError ruby_value_to_cass_statement_by_name(CassStatement* statement, const c
             return ruby_value_to_cass_map_by_name(statement, name, rb_value);
         }
         case T_OBJECT: {
+            // Check if it's a Ruby Date object first (most common case)
+            VALUE date_class = rb_const_get(rb_cObject, rb_intern("Date"));
+            if (rb_obj_is_kind_of(rb_value, date_class)) {
+                return ruby_value_to_cass_date_by_name(statement, name, rb_value);
+            }
+            // Check if it's a Ruby Time object 
+            VALUE time_class = rb_const_get(rb_cObject, rb_intern("Time"));
+            if (rb_obj_is_kind_of(rb_value, time_class)) {
+                return ruby_value_to_cass_timestamp_by_name(statement, name, rb_value);
+            }
             // Check if it's a Ruby Set object
             VALUE set_class = rb_const_get(rb_cObject, rb_intern("Set"));
             if (rb_obj_is_kind_of(rb_value, set_class)) {
@@ -316,17 +328,9 @@ CassError ruby_value_to_cass_statement_by_name(CassStatement* statement, const c
             if (rb_respond_to(rb_value, rb_intern("cassandra_typed_timeuuid?"))) {
                 return ruby_value_to_cass_timeuuid_by_name(statement, name, rb_value);
             }
-            // Check if it's a typed Date
-            if (rb_respond_to(rb_value, rb_intern("cassandra_typed_date?"))) {
-                return ruby_value_to_cass_date_by_name(statement, name, rb_value);
-            }
             // Check if it's a typed Time
             if (rb_respond_to(rb_value, rb_intern("cassandra_typed_time?"))) {
                 return ruby_value_to_cass_time_by_name(statement, name, rb_value);
-            }
-            // Check if it's a typed Timestamp
-            if (rb_respond_to(rb_value, rb_intern("cassandra_typed_timestamp?"))) {
-                return ruby_value_to_cass_timestamp_by_name(statement, name, rb_value);
             }
             // Fall through to default case for other objects
         }
@@ -1565,14 +1569,13 @@ CassError ruby_value_to_cass_date(CassStatement* statement, size_t index, VALUE 
     
     cass_uint32_t date_days;
     
-    // Handle CassandraC::Types::Date objects
-    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
-    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
-    VALUE cDate = rb_const_get(mTypes, rb_intern("Date"));
-    
-    if (rb_obj_is_kind_of(rb_value, cDate)) {
-        VALUE days_value = rb_funcall(rb_value, rb_intern("days_since_epoch"), 0);
-        date_days = (cass_uint32_t)NUM2UINT(days_value);
+    // Handle Ruby Date objects directly
+    VALUE date_class = rb_const_get(rb_cObject, rb_intern("Date"));
+    if (rb_obj_is_kind_of(rb_value, date_class)) {
+        // Convert Ruby Date to days since Unix epoch
+        VALUE epoch_date = rb_funcall(date_class, rb_intern("new"), 3, INT2NUM(1970), INT2NUM(1), INT2NUM(1));
+        VALUE days_diff = rb_funcall(rb_value, rb_intern("-"), 1, epoch_date);
+        date_days = (cass_uint32_t)NUM2UINT(rb_funcall(days_diff, rb_intern("to_i"), 0));
     } else if (FIXNUM_P(rb_value) || TYPE(rb_value) == T_BIGNUM) {
         date_days = (cass_uint32_t)NUM2UINT(rb_value);
     } else {
@@ -1589,14 +1592,13 @@ CassError ruby_value_to_cass_date_by_name(CassStatement* statement, const char* 
     
     cass_uint32_t date_days;
     
-    // Handle CassandraC::Types::Date objects
-    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
-    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
-    VALUE cDate = rb_const_get(mTypes, rb_intern("Date"));
-    
-    if (rb_obj_is_kind_of(rb_value, cDate)) {
-        VALUE days_value = rb_funcall(rb_value, rb_intern("days_since_epoch"), 0);
-        date_days = (cass_uint32_t)NUM2UINT(days_value);
+    // Handle Ruby Date objects directly
+    VALUE date_class = rb_const_get(rb_cObject, rb_intern("Date"));
+    if (rb_obj_is_kind_of(rb_value, date_class)) {
+        // Convert Ruby Date to days since Unix epoch
+        VALUE epoch_date = rb_funcall(date_class, rb_intern("new"), 3, INT2NUM(1970), INT2NUM(1), INT2NUM(1));
+        VALUE days_diff = rb_funcall(rb_value, rb_intern("-"), 1, epoch_date);
+        date_days = (cass_uint32_t)NUM2UINT(rb_funcall(days_diff, rb_intern("to_i"), 0));
     } else if (FIXNUM_P(rb_value) || TYPE(rb_value) == T_BIGNUM) {
         date_days = (cass_uint32_t)NUM2UINT(rb_value);
     } else {
@@ -1663,14 +1665,13 @@ CassError ruby_value_to_cass_timestamp(CassStatement* statement, size_t index, V
     
     cass_int64_t timestamp_millis;
     
-    // Handle CassandraC::Types::Timestamp objects
-    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
-    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
-    VALUE cTimestamp = rb_const_get(mTypes, rb_intern("Timestamp"));
-    
-    if (rb_obj_is_kind_of(rb_value, cTimestamp)) {
-        VALUE millis_value = rb_funcall(rb_value, rb_intern("milliseconds_since_epoch"), 0);
-        timestamp_millis = (cass_int64_t)NUM2LL(millis_value);
+    // Handle Ruby Time objects directly
+    VALUE time_class = rb_const_get(rb_cObject, rb_intern("Time"));
+    if (rb_obj_is_kind_of(rb_value, time_class)) {
+        // Convert Ruby Time to milliseconds since Unix epoch
+        VALUE time_float = rb_funcall(rb_value, rb_intern("to_f"), 0);
+        double time_seconds = NUM2DBL(time_float);
+        timestamp_millis = (cass_int64_t)(time_seconds * 1000.0);
     } else if (FIXNUM_P(rb_value) || TYPE(rb_value) == T_BIGNUM) {
         timestamp_millis = (cass_int64_t)NUM2LL(rb_value);
     } else {
@@ -1687,14 +1688,13 @@ CassError ruby_value_to_cass_timestamp_by_name(CassStatement* statement, const c
     
     cass_int64_t timestamp_millis;
     
-    // Handle CassandraC::Types::Timestamp objects
-    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
-    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
-    VALUE cTimestamp = rb_const_get(mTypes, rb_intern("Timestamp"));
-    
-    if (rb_obj_is_kind_of(rb_value, cTimestamp)) {
-        VALUE millis_value = rb_funcall(rb_value, rb_intern("milliseconds_since_epoch"), 0);
-        timestamp_millis = (cass_int64_t)NUM2LL(millis_value);
+    // Handle Ruby Time objects directly
+    VALUE time_class = rb_const_get(rb_cObject, rb_intern("Time"));
+    if (rb_obj_is_kind_of(rb_value, time_class)) {
+        // Convert Ruby Time to milliseconds since Unix epoch
+        VALUE time_float = rb_funcall(rb_value, rb_intern("to_f"), 0);
+        double time_seconds = NUM2DBL(time_float);
+        timestamp_millis = (cass_int64_t)(time_seconds * 1000.0);
     } else if (FIXNUM_P(rb_value) || TYPE(rb_value) == T_BIGNUM) {
         timestamp_millis = (cass_int64_t)NUM2LL(rb_value);
     } else {

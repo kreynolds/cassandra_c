@@ -51,7 +51,7 @@ class BenchmarkRunner
 
     benchmark_connection_setup
     benchmark_basic_operations
-    benchmark_prepared_statements  
+    benchmark_prepared_statements
     benchmark_batch_operations
     benchmark_type_conversions
     benchmark_collection_operations
@@ -66,36 +66,36 @@ class BenchmarkRunner
 
   def setup_cassandra_connections
     puts "Setting up connections..."
-    
+
     # CassandraC setup
     @cassandra_c_cluster = CassandraC::Native::Cluster.new
     @cassandra_c_cluster.contact_points = CASSANDRA_HOSTS.join(",")
     @cassandra_c_cluster.port = 9042
-    
+
     @cassandra_c_session = CassandraC::Native::Session.new
     @cassandra_c_session.connect(@cassandra_c_cluster)
 
-    # cassandra-driver setup  
+    # cassandra-driver setup
     @cassandra_driver_cluster = Cassandra.cluster(hosts: CASSANDRA_HOSTS)
     @cassandra_driver_session = @cassandra_driver_cluster.connect
 
     puts "Connections established"
   rescue => e
     puts "Error setting up connections: #{e.message}"
-    puts "Make sure Cassandra is running on #{CASSANDRA_HOSTS.join(', ')}"
+    puts "Make sure Cassandra is running on #{CASSANDRA_HOSTS.join(", ")}"
     exit 1
   end
 
   def setup_test_data
     puts "Setting up test keyspace and tables..."
-    
+
     keyspace_cql = <<~SQL
       CREATE KEYSPACE IF NOT EXISTS benchmark_test 
       WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}
     SQL
 
     drop_table_cql = "DROP TABLE IF EXISTS benchmark_test.test_table"
-    
+
     table_cql = <<~SQL
       CREATE TABLE benchmark_test.test_table (
         id TEXT PRIMARY KEY,
@@ -150,7 +150,7 @@ class BenchmarkRunner
   end
 
   def benchmark_basic_operations
-    puts "\n" + "=" * 50  
+    puts "\n" + "=" * 50
     puts "2. Basic Query Operations"
     puts "=" * 50
 
@@ -168,7 +168,7 @@ class BenchmarkRunner
       end
 
       x.report("cassandra-driver simple insert") do
-        @cassandra_driver_session.execute(simple_insert, 
+        @cassandra_driver_session.execute(simple_insert,
           arguments: [SecureRandom.uuid.to_s, SAMPLE_DATA[:text_data]])
       end
 
@@ -186,7 +186,7 @@ class BenchmarkRunner
 
   def benchmark_prepared_statements
     puts "\n" + "=" * 50
-    puts "3. Prepared Statement Performance"  
+    puts "3. Prepared Statement Performance"
     puts "=" * 50
 
     insert_cql = <<~SQL
@@ -240,7 +240,7 @@ class BenchmarkRunner
 
       x.report("cassandra_c batch (10 statements)") do
         batch = CassandraC::Native::Batch.new(:unlogged)
-        
+
         10.times do
           stmt = CassandraC::Native::Statement.new(insert_cql, 3)
           stmt.bind_by_index(0, SecureRandom.uuid.to_s)
@@ -248,21 +248,21 @@ class BenchmarkRunner
           stmt.bind_by_index(2, SAMPLE_DATA[:int_data].to_cassandra_int)
           batch.add(stmt)
         end
-        
+
         @cassandra_c_session.execute_batch(batch)
       end
 
       x.report("cassandra-driver batch (10 statements)") do
         batch = @cassandra_driver_session.unlogged_batch
-        
+
         10.times do
           batch.add(insert_cql, arguments: [
             SecureRandom.uuid.to_s,
-            SAMPLE_DATA[:text_data], 
+            SAMPLE_DATA[:text_data],
             SAMPLE_DATA[:int_data]
           ])
         end
-        
+
         @cassandra_driver_session.execute(batch)
       end
 
@@ -354,7 +354,7 @@ class BenchmarkRunner
 
     # Insert test data first
     insert_cql = "INSERT INTO test_table (id, text_col, int_col, bigint_col) VALUES (?, ?, ?, ?)"
-    
+
     # Insert 100 rows for testing
     100.times do |i|
       stmt = CassandraC::Native::Statement.new(insert_cql, 4)
@@ -387,7 +387,7 @@ class BenchmarkRunner
         result.each do |row|
           count += 1
           row["id"]
-          row["text_col"] 
+          row["text_col"]
           row["int_col"]
         end
       end
@@ -412,7 +412,7 @@ class BenchmarkRunner
     puts "=" * 50
 
     insert_cql = "INSERT INTO test_table (id, text_col, int_col) VALUES (?, ?, ?)"
-    
+
     Benchmark.ips do |x|
       x.config(time: 5, warmup: 2)
 
@@ -495,8 +495,8 @@ class BenchmarkRunner
       10.times do
         batch = @cassandra_driver_session.unlogged_batch
         20.times do
-          batch.add("INSERT INTO test_table (id, text_col) VALUES (?, ?)", 
-                   arguments: [SecureRandom.uuid.to_s, "test"])
+          batch.add("INSERT INTO test_table (id, text_col) VALUES (?, ?)",
+            arguments: [SecureRandom.uuid.to_s, "test"])
         end
         @cassandra_driver_session.execute(batch)
       end
