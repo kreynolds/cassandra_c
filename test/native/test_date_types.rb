@@ -11,12 +11,11 @@ class TestDateTypes < Minitest::Test
 
     # Create keyspace for testing
     @session.query("CREATE KEYSPACE IF NOT EXISTS test_dates WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
-    @session.query("USE test_dates")
 
-    # Drop and recreate table
-    @session.query("DROP TABLE IF EXISTS date_types_table")
+    # Drop and recreate table with fully qualified name
+    @session.query("DROP TABLE IF EXISTS test_dates.date_types_table")
     @session.query(<<~CQL)
-      CREATE TABLE date_types_table (
+      CREATE TABLE test_dates.date_types_table (
         id int PRIMARY KEY,
         date_col date,
         time_col time,
@@ -35,12 +34,12 @@ class TestDateTypes < Minitest::Test
     assert_equal "2023-12-25", date1.to_s
     
     # Test that Date objects can be used in parameter binding
-    prepared = @session.prepare("INSERT INTO date_types_table (id, date_col) VALUES (?, ?)")
+    prepared = @session.prepare("INSERT INTO test_dates.date_types_table (id, date_col) VALUES (?, ?)")
     statement = prepared.bind([99, date1])
     @session.query(statement)
     
     # Verify the data round-trip
-    result = @session.query("SELECT date_col FROM date_types_table WHERE id = 99")
+    result = @session.query("SELECT date_col FROM test_dates.date_types_table WHERE id = 99")
     row = result.first
     assert row[0].is_a?(Date)
     assert_equal "2023-12-25", row[0].to_s
@@ -72,12 +71,12 @@ class TestDateTypes < Minitest::Test
     ruby_time = Time.new(2023, 12, 25, 14, 30, 45, 123.456)
     
     # Test that Time objects can be used in parameter binding
-    prepared = @session.prepare("INSERT INTO date_types_table (id, timestamp_col) VALUES (?, ?)")
+    prepared = @session.prepare("INSERT INTO test_dates.date_types_table (id, timestamp_col) VALUES (?, ?)")
     statement = prepared.bind([98, ruby_time])
     @session.query(statement)
     
     # Verify the data round-trip
-    result = @session.query("SELECT timestamp_col FROM date_types_table WHERE id = 98")
+    result = @session.query("SELECT timestamp_col FROM test_dates.date_types_table WHERE id = 98")
     row = result.first
     assert row[0].is_a?(Time)
     # Check that we get back a time within the same second (millisecond precision loss is expected)
@@ -85,18 +84,18 @@ class TestDateTypes < Minitest::Test
   end
 
   def test_date_type_parameter_binding_by_index
-    prepared = @session.prepare("INSERT INTO date_types_table (id, date_col) VALUES (?, ?)")
+    prepared = @session.prepare("INSERT INTO test_dates.date_types_table (id, date_col) VALUES (?, ?)")
     statement = prepared.bind([1, Date.new(2023, 12, 25)])
     @session.query(statement)
 
     # Test binding by index with specific methods
-    statement2 = CassandraC::Native::Statement.new("INSERT INTO date_types_table (id, date_col) VALUES (?, ?)", 2)
+    statement2 = CassandraC::Native::Statement.new("INSERT INTO test_dates.date_types_table (id, date_col) VALUES (?, ?)", 2)
     statement2.bind_by_index(0, 2)
     statement2.bind_date_by_index(1, Date.new(2024, 1, 1))
     @session.query(statement2)
 
     # Verify the data
-    result = @session.query("SELECT id, date_col FROM date_types_table WHERE id IN (1, 2)")
+    result = @session.query("SELECT id, date_col FROM test_dates.date_types_table WHERE id IN (1, 2)")
     rows = result.to_a
     assert_equal 2, rows.length
 
@@ -112,18 +111,18 @@ class TestDateTypes < Minitest::Test
   end
 
   def test_time_type_parameter_binding_by_index
-    prepared = @session.prepare("INSERT INTO date_types_table (id, time_col) VALUES (?, ?)")
+    prepared = @session.prepare("INSERT INTO test_dates.date_types_table (id, time_col) VALUES (?, ?)")
     statement = prepared.bind([3, CassandraC::Types::Time.new("14:30:45.123")])
     @session.query(statement)
 
     # Test binding by index with specific methods
-    statement2 = CassandraC::Native::Statement.new("INSERT INTO date_types_table (id, time_col) VALUES (?, ?)", 2)
+    statement2 = CassandraC::Native::Statement.new("INSERT INTO test_dates.date_types_table (id, time_col) VALUES (?, ?)", 2)
     statement2.bind_by_index(0, 4)
     statement2.bind_time_by_index(1, CassandraC::Types::Time.new("09:15:30"))
     @session.query(statement2)
 
     # Verify the data
-    result = @session.query("SELECT id, time_col FROM date_types_table WHERE id IN (3, 4)")
+    result = @session.query("SELECT id, time_col FROM test_dates.date_types_table WHERE id IN (3, 4)")
     rows = result.to_a
     assert_equal 2, rows.length
 
@@ -141,18 +140,18 @@ class TestDateTypes < Minitest::Test
   def test_timestamp_type_parameter_binding_by_index
     timestamp = Time.new(2023, 12, 25, 14, 30, 45)
 
-    prepared = @session.prepare("INSERT INTO date_types_table (id, timestamp_col) VALUES (?, ?)")
+    prepared = @session.prepare("INSERT INTO test_dates.date_types_table (id, timestamp_col) VALUES (?, ?)")
     statement = prepared.bind([5, timestamp])
     @session.query(statement)
 
     # Test binding by index with specific methods
-    statement2 = CassandraC::Native::Statement.new("INSERT INTO date_types_table (id, timestamp_col) VALUES (?, ?)", 2)
+    statement2 = CassandraC::Native::Statement.new("INSERT INTO test_dates.date_types_table (id, timestamp_col) VALUES (?, ?)", 2)
     statement2.bind_by_index(0, 6)
     statement2.bind_timestamp_by_index(1, Time.parse("2024-01-01 12:00:00"))
     @session.query(statement2)
 
     # Verify the data
-    result = @session.query("SELECT id, timestamp_col FROM date_types_table WHERE id IN (5, 6)")
+    result = @session.query("SELECT id, timestamp_col FROM test_dates.date_types_table WHERE id IN (5, 6)")
     rows = result.to_a
     assert_equal 2, rows.length
 
@@ -168,9 +167,9 @@ class TestDateTypes < Minitest::Test
   end
 
   def test_date_type_parameter_binding_by_name
-    @session.query("DROP TABLE IF EXISTS named_date_table")
+    @session.query("DROP TABLE IF EXISTS test_dates.named_date_table")
     @session.query(<<~CQL)
-      CREATE TABLE named_date_table (
+      CREATE TABLE test_dates.named_date_table (
         id int PRIMARY KEY,
         birth_date date,
         created_at timestamp,
@@ -179,7 +178,7 @@ class TestDateTypes < Minitest::Test
     CQL
 
     statement = CassandraC::Native::Statement.new(
-      "INSERT INTO named_date_table (id, birth_date, created_at, daily_time) VALUES (:id, :birth, :created, :time)",
+      "INSERT INTO test_dates.named_date_table (id, birth_date, created_at, daily_time) VALUES (:id, :birth, :created, :time)",
       4
     )
 
@@ -191,7 +190,7 @@ class TestDateTypes < Minitest::Test
     @session.query(statement)
 
     # Verify the data
-    result = @session.query("SELECT * FROM named_date_table WHERE id = 1")
+    result = @session.query("SELECT * FROM test_dates.named_date_table WHERE id = 1")
     row = result.first
 
     assert_equal 1, row[0].to_i
@@ -220,7 +219,7 @@ class TestDateTypes < Minitest::Test
   end
 
   def test_null_date_type_handling
-    statement = CassandraC::Native::Statement.new("INSERT INTO date_types_table (id, date_col, time_col, timestamp_col) VALUES (?, ?, ?, ?)", 4)
+    statement = CassandraC::Native::Statement.new("INSERT INTO test_dates.date_types_table (id, date_col, time_col, timestamp_col) VALUES (?, ?, ?, ?)", 4)
     statement.bind_by_index(0, 10)
     statement.bind_date_by_index(1, nil)
     statement.bind_time_by_index(2, nil)
@@ -229,7 +228,7 @@ class TestDateTypes < Minitest::Test
     @session.query(statement)
 
     # Verify null values are handled correctly
-    result = @session.query("SELECT * FROM date_types_table WHERE id = 10")
+    result = @session.query("SELECT * FROM test_dates.date_types_table WHERE id = 10")
     row = result.first
 
     assert_equal 10, row[0].to_i
@@ -271,11 +270,11 @@ class TestDateTypes < Minitest::Test
     # Test epoch date (1970-01-01) with Ruby Date
     epoch_date = Date.new(1970, 1, 1)
     
-    prepared = @session.prepare("INSERT INTO date_types_table (id, date_col) VALUES (?, ?)")
+    prepared = @session.prepare("INSERT INTO test_dates.date_types_table (id, date_col) VALUES (?, ?)")
     statement = prepared.bind([97, epoch_date])
     @session.query(statement)
     
-    result = @session.query("SELECT date_col FROM date_types_table WHERE id = 97")
+    result = @session.query("SELECT date_col FROM test_dates.date_types_table WHERE id = 97")
     row = result.first
     assert row[0].is_a?(Date)
     assert_equal "1970-01-01", row[0].to_s
@@ -291,11 +290,11 @@ class TestDateTypes < Minitest::Test
     # Test timestamp with microsecond precision using Ruby Time
     precise_timestamp = Time.new(2023, 12, 25, 14, 30, 45, 123.456)
     
-    prepared = @session.prepare("INSERT INTO date_types_table (id, timestamp_col) VALUES (?, ?)")
+    prepared = @session.prepare("INSERT INTO test_dates.date_types_table (id, timestamp_col) VALUES (?, ?)")
     statement = prepared.bind([96, precise_timestamp])
     @session.query(statement)
     
-    result = @session.query("SELECT timestamp_col FROM date_types_table WHERE id = 96")
+    result = @session.query("SELECT timestamp_col FROM test_dates.date_types_table WHERE id = 96")
     row = result.first
     assert row[0].is_a?(Time)
     assert_equal precise_timestamp.to_i, row[0].to_i  # Same second
