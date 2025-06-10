@@ -108,16 +108,17 @@ This document outlines all features and improvements needed to make CassandraC a
     - [x] TimeUUID timestamp extraction with `timeuuid.timestamp`
     - [x] Proper type detection in results (UUID vs TimeUUID based on version)
     - [x] String and IPAddr object support, null handling
-  - [x] **Date and time types** ✅ (Complete with comprehensive support):
+  - [x] **Date and time types** ✅ (Complete with native Ruby object integration):
     - [x] Date type with days since Unix epoch (1970-01-01) representation
-    - [x] Time type with nanoseconds since midnight precision
+    - [x] Time type with nanoseconds since midnight precision  
     - [x] Timestamp type with milliseconds since Unix epoch precision
     - [x] `bind_date_by_index` and `bind_date_by_name` methods
-    - [x] `bind_time_by_index` and `bind_time_by_name` methods  
+    - [x] `bind_time_by_index` and `bind_time_by_name` methods
     - [x] `bind_timestamp_by_index` and `bind_timestamp_by_name` methods
-    - [x] Conversion methods: `Date.today.to_cassandra_date`, `Time.now.to_cassandra_timestamp`, `"14:30:45".to_cassandra_time`
-    - [x] Support for Ruby Date, Time objects and string/integer inputs
-    - [x] Comparison operators and equality methods for all date/time types
+    - [x] Native Ruby object integration: DATE columns return Ruby Date objects, TIMESTAMP columns return Ruby Time objects
+    - [x] Only TIME columns use CassandraC::Types::Time wrapper (no Ruby equivalent)
+    - [x] Support for direct Ruby Date/Time object parameter binding
+    - [x] Automatic parameter binding for native Ruby Date/Time objects (T_DATA type support)
     - [x] Proper parameter binding and result parsing in C extension
   - [x] **Inet type (IP addresses)** ✅ (Complete with comprehensive IPv4/IPv6 support):
     - [x] `bind_inet_by_index` and `bind_inet_by_name` methods

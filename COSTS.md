@@ -13,10 +13,12 @@ This document tracks the costs associated with using AI (Claude) to develop feat
 | **Feature** | [Inet Types Support](#inet-types-support) | $1.15 | IP address storage (IPv4/IPv6) |
 | **Feature** | [Decimal/Floating Point Types](#decimalfloating-point-types-support) | $7.84 | FLOAT, DOUBLE, DECIMAL with arbitrary precision |
 | **Feature** | [UUID/TimeUUID Types Support](#uuidtimeuuid-types-support) | $2.15 | UUID and TimeUUID with timestamp extraction |
+| **Feature** | [Date/Time Types Support](#datetime-types-support) | $1.95 | Native Ruby Date/Time integration with comprehensive support |
 | **Refactor** | [Test Suite Refactoring](#test-suite-refactoring) | $1.89 | Centralized helpers, eliminated 62% boilerplate |
 | **Quality** | [SimpleCov Integration & Coverage Enhancement](#simplecov-integration--coverage-enhancement) | $3.47 | Added coverage tracking, raised coverage to 95.57% |
 | **Escape** | [Missing DECIMAL Implementation](ESCAPES.md) | $0.15 | Resolved incomplete original implementation |
-| | **Total Project Cost** | **$25.16** | 7 features + 2 refactors + 1 escape resolution |
+| **Escape** | [T_DATA Object Binding Escape](ESCAPES.md) | $0.25 | Fixed automatic parameter binding for native Ruby Date/Time objects |
+| | **Total Project Cost** | **$27.36** | 8 features + 2 refactors + 2 escape resolutions |
 
 ## Feature Development Costs
 
@@ -188,6 +190,35 @@ This document tracks the costs associated with using AI (Claude) to develop feat
 - Updated EXAMPLES.md with comprehensive UUID/TimeUUID usage examples
 - Updated TODO.md marking UUID/TimeUUID support complete
 
+### Date/Time Types Support
+**Cost**: $1.95  
+**Duration**: 28m 30s (wall time), 19m 45s (API time)  
+**Token Usage**: 167.8k input, 29.3k output  
+**Code Changes**: 487 lines added, 8 lines removed
+
+**Features Implemented**:
+- Complete DATE, TIME, and TIMESTAMP type support with native Ruby object integration
+- DATE columns return Ruby Date objects, TIMESTAMP columns return Ruby Time objects
+- TIME columns use CassandraC::Types::Time wrapper (no Ruby equivalent for time-only)
+- `bind_date_by_index` and `bind_date_by_name` methods
+- `bind_time_by_index` and `bind_time_by_name` methods
+- `bind_timestamp_by_index` and `bind_timestamp_by_name` methods
+- Automatic parameter binding for native Ruby Date/Time objects (T_DATA type support)
+- Direct Ruby Date/Time object parameter binding without wrapper classes
+- Comprehensive test suite with 11 test cases covering all functionality
+- Major API redesign to hide wrapper classes for Date/Timestamp types
+- Fixed T_DATA vs T_OBJECT binding issue (escape resolution)
+- Full qualified table names to resolve Cassandra driver warnings
+
+**Key Deliverables**:
+- `lib/cassandra_c/types.rb` - Only TIME wrapper class remains public, Date/Timestamp hidden
+- `ext/cassandra_c/value.c` - Native Ruby Date/Time object result parsing and T_DATA binding support
+- `ext/cassandra_c/statement.c` - Date/Time binding methods
+- `test/native/test_date_types.rb` - Complete test suite with native object integration
+- `test/test_helper.rb` - Added date/time table DDL for testing
+- Updated EXAMPLES.md with simplified native object API
+- Updated TODO.md marking date/time support complete with native integration
+
 ### Test Suite Refactoring
 **Cost**: $1.89  
 **Duration**: 28m 15s (wall time), 14m 30s (API time)  
@@ -236,13 +267,13 @@ This document tracks the costs associated with using AI (Claude) to develop feat
 ## Cost Analysis
 
 ### Total Project Costs
-- **Feature Development Cost**: $19.65
+- **Feature Development Cost**: $21.60
 - **Test Suite Refactoring Cost**: $1.89
 - **Quality/Coverage Enhancement Cost**: $3.47
-- **Escape Resolution Cost**: $0.15 (see ESCAPES.md)
-- **Total Project Cost**: $25.16
-- **Total Features**: 7 major data type implementations + 2 major refactoring/quality improvements
-- **Average Cost per Major Deliverable**: $2.79
+- **Escape Resolution Cost**: $0.40 (see ESCAPES.md)
+- **Total Project Cost**: $27.36
+- **Total Features**: 8 major data type implementations + 2 major refactoring/quality improvements
+- **Average Cost per Major Deliverable**: $2.74
 
 ### Cost Observations
 1. **Feature complexity correlation with costs**:
@@ -253,6 +284,7 @@ This document tracks the costs associated with using AI (Claude) to develop feat
    - Inet types: $1.15 (76% cheaper, following established patterns with helper function optimization)
    - Decimal/Floating Point types: $7.84 (66% higher than baseline, complex varint encoding + escape resolution)
    - UUID/TimeUUID types: $2.15 (54% cheaper than baseline, moderate complexity with timestamp generation)
+   - Date/Time types: $1.95 (59% cheaper than baseline, native Ruby object integration + escape resolution)
    - Test suite refactoring: $1.89 (60% cheaper than baseline, refactoring existing code rather than new features)
    - SimpleCov integration: $3.47 (26% cheaper than baseline, quality tooling + comprehensive test coverage)
 
@@ -260,11 +292,13 @@ This document tracks the costs associated with using AI (Claude) to develop feat
    - Counter implementation: ~8 minutes (fastest, leveraging existing patterns)
    - Inet implementation: ~11 minutes (fast, established C binding patterns)
    - Test suite refactoring: ~28 minutes (moderate, systematic code cleanup across multiple files)
+   - Date/Time implementation: ~29 minutes (native Ruby object integration + escape resolution)
    - Decimal implementation: ~74 minutes (complex varint encoding + escape resolution)
    - Simple features benefit greatly from established patterns
    - Refactoring tasks provide excellent value (62% code reduction for modest cost)
    - Complex features still require significant implementation time
    - Escape resolution adds overhead but ensures complete functionality
+   - Native object integration provides better API but requires careful type handling
 
 3. **Pattern reuse benefits**:
    - Established C extension patterns for binding and result extraction
@@ -288,8 +322,10 @@ This document tracks the costs associated with using AI (Claude) to develop feat
 - ✅ Complete arbitrary precision decimal arithmetic support
 - ✅ Integration with Ruby's BigDecimal class
 - ✅ Varint encoding for Cassandra compatibility
-- ✅ Low escape rate: 1 escape across 6 features (0.85% cost overhead)
+- ⚠️ Moderate escape rate: 2 escapes across 8 features (1.5% cost overhead)
 - ✅ Maintainable test patterns for future development
+- ✅ Native Ruby object integration improves API usability
+- ✅ T_DATA vs T_OBJECT binding issue resolved
 
 ## Future Cost Predictions
 

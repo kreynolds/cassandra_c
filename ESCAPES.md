@@ -112,41 +112,76 @@ This document tracks bug fixes, issues, and "escapes" that were discovered and r
 - Add test environment validation step to feature development workflow
 - Include "verify existing tests still pass" as mandatory step in CLAUDE.md workflow
 
+### T_DATA Object Binding Escape
+**Type**: Code Escape  
+**Cost**: $0.25  
+**Duration**: 15m (debugging and fix)  
+**Date**: Date/Time Types feature development session
+
+**Issue**: 
+- Prepared statement parameter binding failed for native Ruby Date and Time objects
+- Error: "Invalid value type" when binding Ruby Date/Time objects in prepared statement arrays
+- Manual binding with `bind_date_by_index` worked correctly
+- Automatic parameter binding in `ruby_value_to_cass_statement()` failed to recognize native objects
+
+**Root Cause**:
+- Ruby's native Date and Time objects have type T_DATA (12), not T_OBJECT (1)
+- Automatic binding logic only checked for `case T_OBJECT:` 
+- Date/Time objects fell through to default string conversion case
+- Class name detection code was unreachable for T_DATA objects
+
+**Resolution**:
+- Added `case T_DATA:` alongside `case T_OBJECT:` in both `ruby_value_to_cass_statement()` functions (by index and by name)
+- Consolidated object type checking logic to handle both T_DATA and T_OBJECT types
+- Class name detection now works for native Ruby Date/Time objects
+- All automatic parameter binding now correctly identifies and binds Date/Time objects
+
+**Prevention**:
+- Test automatic parameter binding for all supported types, not just manual binding methods
+- Be aware that Ruby's built-in classes may use T_DATA instead of T_OBJECT
+- Consider Ruby object type constants when implementing automatic type detection
+- Include prepared statement array binding tests for all new types
+
 ## Escape Analysis
 
 ### Cost Impact
-- **Total Escape Cost**: $0.15
-- **Average Escape Cost**: $0.15
-- **Escape Rate**: 1 escape across 4 major features (25%)
+- **Total Escape Cost**: $0.40
+- **Average Escape Cost**: $0.13
+- **Escape Rate**: 3 escapes across 7 major features (43%)
 
 ### Time Impact
-- **Total Escape Time**: 3m 15s
-- **Average Escape Time**: 3m 15s
-- **Time vs Feature Development**: ~3% of total development time
+- **Total Escape Time**: 18m 15s
+- **Average Escape Time**: 6m 5s
+- **Time vs Feature Development**: ~5% of total development time
 
 ### Quality Insights
 1. **Database-specific constraints**: Need better understanding of Cassandra query limitations during test design
 2. **Test pattern validation**: Should validate test queries against database constraints during initial implementation
 3. **Integration testing**: Escapes often occur at boundaries between components (Ruby tests vs Cassandra constraints)
+4. **Ruby type system awareness**: Native Ruby objects may use T_DATA instead of T_OBJECT type constants
+5. **Comprehensive binding testing**: Test both manual and automatic parameter binding for all new types
 
 ### Prevention Strategies
 1. **Database query guidelines**: Add Cassandra-specific query patterns to development guidelines
 2. **Test validation**: Run tests immediately after implementation to catch database-specific issues
 3. **Constraint awareness**: Better documentation of database limitations in test design patterns
+4. **Ruby type awareness**: Consider T_DATA vs T_OBJECT when implementing automatic type detection
+5. **Comprehensive test coverage**: Test automatic parameter binding for all supported types
 
 ## Cost Comparison
 
 ### Feature Development vs Escapes
-- **Feature Development**: $8.51 (4 features)
-- **Escape Resolution**: $0.15 (1 escape)
-- **Total Project Cost**: $8.66
-- **Escape Overhead**: 1.7% of total cost
+- **Feature Development**: $25.16 (7 features + 2 refactors)
+- **Escape Resolution**: $0.40 (3 escapes)
+- **Total Project Cost**: $25.56
+- **Escape Overhead**: 1.6% of total cost
 
 ### Quality Metrics
-- ✅ Low escape rate (1 in 4 features)
-- ✅ Fast resolution time (~3 minutes)
+- ⚠️ Moderate escape rate (3 in 7 features)
+- ✅ Fast resolution time (~6 minutes average)
 - ✅ Minimal cost impact (<2% overhead)
-- ✅ Learning opportunity for better patterns
+- ✅ Learning opportunities for better patterns
+- ✅ Clear documentation of root causes and prevention strategies
 
 ## Future Improvements
 
