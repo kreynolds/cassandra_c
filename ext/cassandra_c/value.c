@@ -127,15 +127,17 @@ CassError ruby_value_to_cass_statement(CassStatement* statement, size_t index, V
             // Handle Ruby Hash as map
             return ruby_value_to_cass_map(statement, index, rb_value);
         }
+        case T_DATA:
         case T_OBJECT: {
-            // Check if it's a Ruby Date object first (most common case)
-            VALUE date_class = rb_const_get(rb_cObject, rb_intern("Date"));
-            if (rb_obj_is_kind_of(rb_value, date_class)) {
+            // Check for Date objects by class name (safer than rb_const_get)
+            VALUE klass = rb_obj_class(rb_value);
+            VALUE class_name = rb_class_name(klass);
+            const char* class_name_str = StringValueCStr(class_name);
+            
+            if (strcmp(class_name_str, "Date") == 0) {
                 return ruby_value_to_cass_date(statement, index, rb_value);
             }
-            // Check if it's a Ruby Time object 
-            VALUE time_class = rb_const_get(rb_cObject, rb_intern("Time"));
-            if (rb_obj_is_kind_of(rb_value, time_class)) {
+            if (strcmp(class_name_str, "Time") == 0) {
                 return ruby_value_to_cass_timestamp(statement, index, rb_value);
             }
             // Check if it's a Ruby Set object
@@ -274,15 +276,17 @@ CassError ruby_value_to_cass_statement_by_name(CassStatement* statement, const c
             // Handle Ruby Hash as map
             return ruby_value_to_cass_map_by_name(statement, name, rb_value);
         }
+        case T_DATA:
         case T_OBJECT: {
-            // Check if it's a Ruby Date object first (most common case)
-            VALUE date_class = rb_const_get(rb_cObject, rb_intern("Date"));
-            if (rb_obj_is_kind_of(rb_value, date_class)) {
+            // Check for Date objects by class name (safer than rb_const_get)
+            VALUE klass = rb_obj_class(rb_value);
+            VALUE class_name = rb_class_name(klass);
+            const char* class_name_str = StringValueCStr(class_name);
+            
+            if (strcmp(class_name_str, "Date") == 0) {
                 return ruby_value_to_cass_date_by_name(statement, name, rb_value);
             }
-            // Check if it's a Ruby Time object 
-            VALUE time_class = rb_const_get(rb_cObject, rb_intern("Time"));
-            if (rb_obj_is_kind_of(rb_value, time_class)) {
+            if (strcmp(class_name_str, "Time") == 0) {
                 return ruby_value_to_cass_timestamp_by_name(statement, name, rb_value);
             }
             // Check if it's a Ruby Set object

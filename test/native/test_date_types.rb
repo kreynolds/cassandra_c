@@ -32,12 +32,12 @@ class TestDateTypes < Minitest::Test
     # Test that we can work with Ruby Date objects directly
     date1 = Date.new(2023, 12, 25)
     assert_equal "2023-12-25", date1.to_s
-    
+
     # Test that Date objects can be used in parameter binding
     prepared = @session.prepare("INSERT INTO test_dates.date_types_table (id, date_col) VALUES (?, ?)")
     statement = prepared.bind([99, date1])
     @session.query(statement)
-    
+
     # Verify the data round-trip
     result = @session.query("SELECT date_col FROM test_dates.date_types_table WHERE id = 99")
     row = result.first
@@ -69,12 +69,12 @@ class TestDateTypes < Minitest::Test
   def test_native_ruby_time_objects
     # Test that we can work with Ruby Time objects directly
     ruby_time = Time.new(2023, 12, 25, 14, 30, 45, 123.456)
-    
+
     # Test that Time objects can be used in parameter binding
     prepared = @session.prepare("INSERT INTO test_dates.date_types_table (id, timestamp_col) VALUES (?, ?)")
     statement = prepared.bind([98, ruby_time])
     @session.query(statement)
-    
+
     # Verify the data round-trip
     result = @session.query("SELECT timestamp_col FROM test_dates.date_types_table WHERE id = 98")
     row = result.first
@@ -269,11 +269,11 @@ class TestDateTypes < Minitest::Test
   def test_date_time_edge_cases
     # Test epoch date (1970-01-01) with Ruby Date
     epoch_date = Date.new(1970, 1, 1)
-    
+
     prepared = @session.prepare("INSERT INTO test_dates.date_types_table (id, date_col) VALUES (?, ?)")
     statement = prepared.bind([97, epoch_date])
     @session.query(statement)
-    
+
     result = @session.query("SELECT date_col FROM test_dates.date_types_table WHERE id = 97")
     row = result.first
     assert row[0].is_a?(Date)
@@ -289,11 +289,11 @@ class TestDateTypes < Minitest::Test
 
     # Test timestamp with microsecond precision using Ruby Time
     precise_timestamp = Time.new(2023, 12, 25, 14, 30, 45, 123.456)
-    
+
     prepared = @session.prepare("INSERT INTO test_dates.date_types_table (id, timestamp_col) VALUES (?, ?)")
     statement = prepared.bind([96, precise_timestamp])
     @session.query(statement)
-    
+
     result = @session.query("SELECT timestamp_col FROM test_dates.date_types_table WHERE id = 96")
     row = result.first
     assert row[0].is_a?(Time)

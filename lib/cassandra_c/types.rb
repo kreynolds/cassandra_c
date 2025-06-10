@@ -528,7 +528,6 @@ module CassandraC
       end
     end
 
-
     # Time type - Cassandra TIME (nanoseconds since midnight)
     class Time
       NANOSECONDS_PER_SECOND = 1_000_000_000
@@ -667,7 +666,6 @@ module CassandraC
         seconds_since_midnight * NANOSECONDS_PER_SECOND + time.nsec
       end
     end
-
   end
 end
 
