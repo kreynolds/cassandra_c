@@ -103,6 +103,10 @@ VALUE cass_value_to_ruby(const CassValue* value);
 CassError ruby_value_to_cass_statement(CassStatement* statement, size_t index, VALUE rb_value);
 CassError ruby_value_to_cass_statement_by_name(CassStatement* statement, const char* name, VALUE rb_value);
 
+// Type-hinted value conversion
+CassError ruby_value_to_cass_statement_with_type(CassStatement* statement, size_t index, VALUE rb_value, VALUE type_hint);
+CassError ruby_value_to_cass_statement_with_type_by_name(CassStatement* statement, const char* name, VALUE rb_value, VALUE type_hint);
+
 // Type-specific binding functions
 CassError ruby_string_to_cass_text(CassStatement* statement, size_t index, VALUE rb_value);
 CassError ruby_string_to_cass_text_by_name(CassStatement* statement, const char* name, VALUE rb_value);
@@ -128,6 +132,14 @@ CassError ruby_value_to_cass_set(CassStatement* statement, size_t index, VALUE r
 CassError ruby_value_to_cass_set_by_name(CassStatement* statement, const char* name, VALUE rb_value);
 CassError ruby_value_to_cass_map(CassStatement* statement, size_t index, VALUE rb_value);
 CassError ruby_value_to_cass_map_by_name(CassStatement* statement, const char* name, VALUE rb_value);
+
+// Type-hinted collection binding functions
+CassError ruby_value_to_cass_list_with_type(CassStatement* statement, size_t index, VALUE rb_value, VALUE element_type);
+CassError ruby_value_to_cass_list_with_type_by_name(CassStatement* statement, const char* name, VALUE rb_value, VALUE element_type);
+CassError ruby_value_to_cass_set_with_type(CassStatement* statement, size_t index, VALUE rb_value, VALUE element_type);
+CassError ruby_value_to_cass_set_with_type_by_name(CassStatement* statement, const char* name, VALUE rb_value, VALUE element_type);
+CassError ruby_value_to_cass_map_with_type(CassStatement* statement, size_t index, VALUE rb_value, VALUE key_type, VALUE value_type);
+CassError ruby_value_to_cass_map_with_type_by_name(CassStatement* statement, const char* name, VALUE rb_value, VALUE key_type, VALUE value_type);
 
 // ============================================================================
 // Module Initialization Functions

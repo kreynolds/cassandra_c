@@ -82,8 +82,11 @@ static VALUE rb_statement_set_consistency(VALUE self, VALUE consistency) {
     return self;
 }
 
-// Bind a value by index
-static VALUE rb_statement_bind_by_index(VALUE self, VALUE index, VALUE value) {
+// Bind a value by index with optional type hint
+static VALUE rb_statement_bind_by_index(int argc, VALUE* argv, VALUE self) {
+    VALUE index, value, type_hint;
+    rb_scan_args(argc, argv, "21", &index, &value, &type_hint);
+    
     StatementWrapper* wrapper;
     TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
     
@@ -92,7 +95,15 @@ static VALUE rb_statement_bind_by_index(VALUE self, VALUE index, VALUE value) {
     }
     
     size_t param_index = NUM2SIZET(index);
-    CassError error = ruby_value_to_cass_statement(wrapper->statement, param_index, value);
+    CassError error;
+    
+    if (NIL_P(type_hint)) {
+        // Use default binding logic without type hint
+        error = ruby_value_to_cass_statement(wrapper->statement, param_index, value);
+    } else {
+        // Use type-hinted binding
+        error = ruby_value_to_cass_statement_with_type(wrapper->statement, param_index, value, type_hint);
+    }
     
     if (error != CASS_OK) {
         rb_raise(rb_eCassandraError, "Failed to bind parameter at index %zu: %s", 
@@ -102,8 +113,11 @@ static VALUE rb_statement_bind_by_index(VALUE self, VALUE index, VALUE value) {
     return self;
 }
 
-// Bind a value by name
-static VALUE rb_statement_bind_by_name(VALUE self, VALUE name, VALUE value) {
+// Bind a value by name with optional type hint
+static VALUE rb_statement_bind_by_name(int argc, VALUE* argv, VALUE self) {
+    VALUE name, value, type_hint;
+    rb_scan_args(argc, argv, "21", &name, &value, &type_hint);
+    
     StatementWrapper* wrapper;
     TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
     
@@ -113,7 +127,15 @@ static VALUE rb_statement_bind_by_name(VALUE self, VALUE name, VALUE value) {
     
     Check_Type(name, T_STRING);
     const char* param_name = StringValueCStr(name);
-    CassError error = ruby_value_to_cass_statement_by_name(wrapper->statement, param_name, value);
+    CassError error;
+    
+    if (NIL_P(type_hint)) {
+        // Use default binding logic without type hint
+        error = ruby_value_to_cass_statement_by_name(wrapper->statement, param_name, value);
+    } else {
+        // Use type-hinted binding
+        error = ruby_value_to_cass_statement_with_type_by_name(wrapper->statement, param_name, value, type_hint);
+    }
     
     if (error != CASS_OK) {
         rb_raise(rb_eCassandraError, "Failed to bind parameter '%s': %s", 
@@ -500,6 +522,197 @@ static VALUE rb_statement_bind_timeuuid_by_name(VALUE self, VALUE name, VALUE va
     return self;
 }
 
+// Type-hinted collection binding methods
+
+// Bind a list value by index with element type hint
+static VALUE rb_statement_bind_list_by_index(int argc, VALUE* argv, VALUE self) {
+    VALUE index, value, element_type;
+    rb_scan_args(argc, argv, "21", &index, &value, &element_type);
+    
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    size_t param_index = NUM2SIZET(index);
+    CassError error;
+    
+    if (NIL_P(element_type)) {
+        // Use default list binding without type hint
+        error = ruby_value_to_cass_list(wrapper->statement, param_index, value);
+    } else {
+        // Use type-hinted list binding
+        error = ruby_value_to_cass_list_with_type(wrapper->statement, param_index, value, element_type);
+    }
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind list parameter at index %zu: %s", 
+                 param_index, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a list value by name with element type hint
+static VALUE rb_statement_bind_list_by_name(int argc, VALUE* argv, VALUE self) {
+    VALUE name, value, element_type;
+    rb_scan_args(argc, argv, "21", &name, &value, &element_type);
+    
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    Check_Type(name, T_STRING);
+    const char* param_name = StringValueCStr(name);
+    CassError error;
+    
+    if (NIL_P(element_type)) {
+        // Use default list binding without type hint
+        error = ruby_value_to_cass_list_by_name(wrapper->statement, param_name, value);
+    } else {
+        // Use type-hinted list binding
+        error = ruby_value_to_cass_list_with_type_by_name(wrapper->statement, param_name, value, element_type);
+    }
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind list parameter '%s': %s", 
+                 param_name, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a set value by index with element type hint
+static VALUE rb_statement_bind_set_by_index(int argc, VALUE* argv, VALUE self) {
+    VALUE index, value, element_type;
+    rb_scan_args(argc, argv, "21", &index, &value, &element_type);
+    
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    size_t param_index = NUM2SIZET(index);
+    CassError error;
+    
+    if (NIL_P(element_type)) {
+        // Use default set binding without type hint
+        error = ruby_value_to_cass_set(wrapper->statement, param_index, value);
+    } else {
+        // Use type-hinted set binding
+        error = ruby_value_to_cass_set_with_type(wrapper->statement, param_index, value, element_type);
+    }
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind set parameter at index %zu: %s", 
+                 param_index, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a set value by name with element type hint
+static VALUE rb_statement_bind_set_by_name(int argc, VALUE* argv, VALUE self) {
+    VALUE name, value, element_type;
+    rb_scan_args(argc, argv, "21", &name, &value, &element_type);
+    
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    Check_Type(name, T_STRING);
+    const char* param_name = StringValueCStr(name);
+    CassError error;
+    
+    if (NIL_P(element_type)) {
+        // Use default set binding without type hint
+        error = ruby_value_to_cass_set_by_name(wrapper->statement, param_name, value);
+    } else {
+        // Use type-hinted set binding
+        error = ruby_value_to_cass_set_with_type_by_name(wrapper->statement, param_name, value, element_type);
+    }
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind set parameter '%s': %s", 
+                 param_name, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a map value by index with key and value type hints
+static VALUE rb_statement_bind_map_by_index(int argc, VALUE* argv, VALUE self) {
+    VALUE index, value, key_type, value_type;
+    rb_scan_args(argc, argv, "22", &index, &value, &key_type, &value_type);
+    
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    size_t param_index = NUM2SIZET(index);
+    CassError error;
+    
+    if (NIL_P(key_type) && NIL_P(value_type)) {
+        // Use default map binding without type hint
+        error = ruby_value_to_cass_map(wrapper->statement, param_index, value);
+    } else {
+        // Use type-hinted map binding
+        error = ruby_value_to_cass_map_with_type(wrapper->statement, param_index, value, key_type, value_type);
+    }
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind map parameter at index %zu: %s", 
+                 param_index, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a map value by name with key and value type hints
+static VALUE rb_statement_bind_map_by_name(int argc, VALUE* argv, VALUE self) {
+    VALUE name, value, key_type, value_type;
+    rb_scan_args(argc, argv, "22", &name, &value, &key_type, &value_type);
+    
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    Check_Type(name, T_STRING);
+    const char* param_name = StringValueCStr(name);
+    CassError error;
+    
+    if (NIL_P(key_type) && NIL_P(value_type)) {
+        // Use default map binding without type hint
+        error = ruby_value_to_cass_map_by_name(wrapper->statement, param_name, value);
+    } else {
+        // Use type-hinted map binding
+        error = ruby_value_to_cass_map_with_type_by_name(wrapper->statement, param_name, value, key_type, value_type);
+    }
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind map parameter '%s': %s", 
+                 param_name, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
 // Initialize the Statement class within the CassandraC module
 VALUE cCassStatement;
 void Init_cassandra_c_statement(VALUE module) {
@@ -508,8 +721,8 @@ void Init_cassandra_c_statement(VALUE module) {
     rb_define_alloc_func(cCassStatement, rb_statement_allocate);
     rb_define_method(cCassStatement, "initialize", rb_statement_initialize, -1);
     rb_define_method(cCassStatement, "consistency=", rb_statement_set_consistency, 1);
-    rb_define_method(cCassStatement, "bind_by_index", rb_statement_bind_by_index, 2);
-    rb_define_method(cCassStatement, "bind_by_name", rb_statement_bind_by_name, 2);
+    rb_define_method(cCassStatement, "bind_by_index", rb_statement_bind_by_index, -1);
+    rb_define_method(cCassStatement, "bind_by_name", rb_statement_bind_by_name, -1);
     
     // Type-specific binding methods
     rb_define_method(cCassStatement, "bind_text_by_index", rb_statement_bind_text_by_index, 2);
@@ -530,4 +743,12 @@ void Init_cassandra_c_statement(VALUE module) {
     rb_define_method(cCassStatement, "bind_uuid_by_name", rb_statement_bind_uuid_by_name, 2);
     rb_define_method(cCassStatement, "bind_timeuuid_by_index", rb_statement_bind_timeuuid_by_index, 2);
     rb_define_method(cCassStatement, "bind_timeuuid_by_name", rb_statement_bind_timeuuid_by_name, 2);
+    
+    // Type-hinted collection binding methods
+    rb_define_method(cCassStatement, "bind_list_by_index", rb_statement_bind_list_by_index, -1);
+    rb_define_method(cCassStatement, "bind_list_by_name", rb_statement_bind_list_by_name, -1);
+    rb_define_method(cCassStatement, "bind_set_by_index", rb_statement_bind_set_by_index, -1);
+    rb_define_method(cCassStatement, "bind_set_by_name", rb_statement_bind_set_by_name, -1);
+    rb_define_method(cCassStatement, "bind_map_by_index", rb_statement_bind_map_by_index, -1);
+    rb_define_method(cCassStatement, "bind_map_by_name", rb_statement_bind_map_by_name, -1);
 }

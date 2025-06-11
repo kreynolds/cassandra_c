@@ -53,6 +53,10 @@ module TestEnvironment
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.list_types (id text PRIMARY KEY, string_list list<text>, int_list list<int>, mixed_list list<text>)")
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.set_types (id text PRIMARY KEY, string_set set<text>, int_set set<int>, mixed_set set<text>)")
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.map_types (id text PRIMARY KEY, string_map map<text, text>, int_map map<text, int>, mixed_map map<text, text>)")
+    # Type-hinted collection test tables
+    session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.typed_list_types (id text PRIMARY KEY, tinyint_list list<tinyint>, smallint_list list<smallint>, int_list list<int>, bigint_list list<bigint>, varint_list list<varint>, float_list list<float>, double_list list<double>)")
+    session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.typed_set_types (id text PRIMARY KEY, tinyint_set set<tinyint>, smallint_set set<smallint>, int_set set<int>, bigint_set set<bigint>, varint_set set<varint>, float_set set<float>, double_set set<double>)")
+    session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.typed_map_types (id text PRIMARY KEY, text_tinyint_map map<text, tinyint>, text_smallint_map map<text, smallint>, text_int_map map<text, int>, text_bigint_map map<text, bigint>, text_varint_map map<text, varint>, text_float_map map<text, float>, text_double_map map<text, double>)")
     # String type test tables
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.test_text_types (id text PRIMARY KEY, text_col text, varchar_col varchar)")
     session.query("CREATE TABLE IF NOT EXISTS cassandra_c_test.test_ascii_types (id text PRIMARY KEY, ascii_col ascii)")

@@ -4,19 +4,28 @@ require "test_helper"
 
 class TestBooleanTypes < Minitest::Test
   def test_boolean_binding_with_array_parameters
-    # Test binding boolean values using array parameter binding
+    # Test binding boolean values using manual parameter binding
     prepared = session.prepare("INSERT INTO cassandra_c_test.boolean_test (id, bool_val, nullable_bool) VALUES (?, ?, ?)")
 
     # Test true value
-    statement = prepared.bind([1, true, true])
+    statement = prepared.bind
+    statement.bind_by_index(0, 1, :int)
+    statement.bind_by_index(1, true)
+    statement.bind_by_index(2, true)
     session.execute(statement)
 
     # Test false value
-    statement = prepared.bind([2, false, false])
+    statement = prepared.bind
+    statement.bind_by_index(0, 2, :int)
+    statement.bind_by_index(1, false)
+    statement.bind_by_index(2, false)
     session.execute(statement)
 
     # Test nil (null) value
-    statement = prepared.bind([3, true, nil])
+    statement = prepared.bind
+    statement.bind_by_index(0, 3, :int)
+    statement.bind_by_index(1, true)
+    statement.bind_by_index(2, nil)
     session.execute(statement)
 
     # Verify data was inserted correctly

@@ -158,12 +158,12 @@ class TestBatchStatements < Minitest::Test
 
     # Create counter update statements
     statement1 = CassandraC::Native::Statement.new("UPDATE cassandra_c_test.single_counter SET count = count + ? WHERE id = ?", 2)
-    statement1.bind_by_index(0, 10.to_cassandra_bigint)
+    statement1.bind_by_index(0, 10, :bigint)
     statement1.bind_by_index(1, "counter1")
     batch.add(statement1)
 
     statement2 = CassandraC::Native::Statement.new("UPDATE cassandra_c_test.single_counter SET count = count + ? WHERE id = ?", 2)
-    statement2.bind_by_index(0, 20.to_cassandra_bigint)
+    statement2.bind_by_index(0, 20, :bigint)
     statement2.bind_by_index(1, "counter2")
     batch.add(statement2)
 

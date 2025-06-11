@@ -3,609 +3,74 @@ require "securerandom"
 
 module CassandraC
   module Types
-    # Abstract base class for fixed-width signed integers
-    class FixedWidthInteger
-      def initialize(value)
-        unless value.is_a?(Integer)
-          raise ArgumentError, "Value must be an integer, got #{value.class}"
-        end
-        @value = self.class.normalize(value)
-      end
+    # All types now use native Ruby equivalents with type hints
+    # No wrapper classes needed for basic types except TimeUuid
 
-      # Normalize value to the bit-size range using modulo for overflow
-      def self.normalize(num)
-        num %= (1 << self::BIT_SIZE)
-        num -= (1 << self::BIT_SIZE) if num >= (1 << (self::BIT_SIZE - 1))
-        num
-      end
-
-      # Return the underlying Integer value
-      def to_i
-        @value
-      end
-
-      # Delegate most methods to the wrapped integer
-      def method_missing(method, ...)
-        result = @value.send(method, ...)
-        if result.is_a?(Integer) && ![:==, :<=>, :<, :<=, :>, :>=, :eql?, :hash].include?(method)
-          self.class.new(result)
-        else
-          result
-        end
-      end
-
-      def respond_to_missing?(method, include_private = false)
-        @value.respond_to?(method, include_private) || super
-      end
-
-      def ==(other)
-        @value == (other.is_a?(FixedWidthInteger) ? other.to_i : other)
-      end
-
-      def <=>(other)
-        @value <=> (other.is_a?(FixedWidthInteger) ? other.to_i : other)
-      end
-
-      def inspect
-        "#{self.class.name.split("::").last}(#{@value})"
-      end
-
-      def coerce(other)
-        [other, @value]
-      end
-
-      # Marker method to identify as a typed integer
-      def cassandra_typed_integer?
-        true
-      end
-    end
-
-    # 8-bit signed integer (-128 to 127) - Cassandra TINYINT
-    class TinyInt < FixedWidthInteger
-      BIT_SIZE = 8
-      MIN_VALUE = -128
-      MAX_VALUE = 127
-    end
-
-    # 16-bit signed integer (-32,768 to 32,767) - Cassandra SMALLINT
-    class SmallInt < FixedWidthInteger
-      BIT_SIZE = 16
-      MIN_VALUE = -32768
-      MAX_VALUE = 32767
-    end
-
-    # 32-bit signed integer (-2,147,483,648 to 2,147,483,647) - Cassandra INT
-    class Int < FixedWidthInteger
-      BIT_SIZE = 32
-      MIN_VALUE = -2147483648
-      MAX_VALUE = 2147483647
-    end
-
-    # 64-bit signed integer - Cassandra BIGINT
-    class BigInt < FixedWidthInteger
-      BIT_SIZE = 64
-      MIN_VALUE = -9223372036854775808
-      MAX_VALUE = 9223372036854775807
-    end
-
-    # Variable-length integer - Cassandra VARINT (no size limit)
-    class VarInt
-      def initialize(value)
-        unless value.is_a?(Integer)
-          raise ArgumentError, "Value must be an integer, got #{value.class}"
-        end
-        @value = value
-      end
-
-      def to_i
-        @value
-      end
-
-      def to_s
-        @value.to_s
-      end
-
-      def inspect
-        "VarInt(#{@value})"
-      end
-
-      def method_missing(method, ...)
-        result = @value.send(method, ...)
-        if result.is_a?(Integer) && ![:==, :<=>, :<, :<=, :>, :>=, :eql?, :hash].include?(method)
-          self.class.new(result)
-        else
-          result
-        end
-      end
-
-      def respond_to_missing?(method, include_private = false)
-        @value.respond_to?(method, include_private) || super
-      end
-
-      def ==(other)
-        @value == (other.is_a?(VarInt) ? other.to_i : other)
-      end
-
-      def <=>(other)
-        @value <=> (other.is_a?(VarInt) ? other.to_i : other)
-      end
-
-      def coerce(other)
-        [other, @value]
-      end
-
-      # Marker method to identify as a typed integer
-      def cassandra_typed_integer?
-        true
-      end
-    end
-
-    # 32-bit IEEE 754 floating point - Cassandra FLOAT
-    class Float
-      def initialize(value)
-        unless value.is_a?(Numeric)
-          raise ArgumentError, "Value must be numeric, got #{value.class}"
-        end
-        @value = value.to_f
-      end
-
-      def to_f
-        @value
-      end
-
-      def to_s
-        @value.to_s
-      end
-
-      def inspect
-        "Float(#{@value})"
-      end
-
-      def method_missing(method, ...)
-        result = @value.send(method, ...)
-        if result.is_a?(Numeric) && ![:==, :<=>, :<, :<=, :>, :>=, :eql?, :hash].include?(method)
-          self.class.new(result)
-        else
-          result
-        end
-      end
-
-      def respond_to_missing?(method, include_private = false)
-        @value.respond_to?(method, include_private) || super
-      end
-
-      def ==(other)
-        @value == (other.is_a?(self.class) ? other.to_f : other)
-      end
-
-      def <=>(other)
-        @value <=> (other.is_a?(self.class) ? other.to_f : other)
-      end
-
-      def coerce(other)
-        [other, @value]
-      end
-
-      # Marker method to identify as a typed float
-      def cassandra_typed_float?
-        true
-      end
-    end
-
-    # 64-bit IEEE 754 floating point - Cassandra DOUBLE
-    class Double
-      def initialize(value)
-        unless value.is_a?(Numeric)
-          raise ArgumentError, "Value must be numeric, got #{value.class}"
-        end
-        @value = value.to_f
-      end
-
-      def to_f
-        @value
-      end
-
-      def to_s
-        @value.to_s
-      end
-
-      def inspect
-        "Double(#{@value})"
-      end
-
-      def method_missing(method, ...)
-        result = @value.send(method, ...)
-        if result.is_a?(Numeric) && ![:==, :<=>, :<, :<=, :>, :>=, :eql?, :hash].include?(method)
-          self.class.new(result)
-        else
-          result
-        end
-      end
-
-      def respond_to_missing?(method, include_private = false)
-        @value.respond_to?(method, include_private) || super
-      end
-
-      def ==(other)
-        @value == (other.is_a?(self.class) ? other.to_f : other)
-      end
-
-      def <=>(other)
-        @value <=> (other.is_a?(self.class) ? other.to_f : other)
-      end
-
-      def coerce(other)
-        [other, @value]
-      end
-
-      # Marker method to identify as a typed double
-      def cassandra_typed_double?
-        true
-      end
-    end
-
-    # Arbitrary precision decimal - Cassandra DECIMAL
-    class Decimal
-      def initialize(value, scale = nil)
-        case value
-        when BigDecimal
-          @value = value
-          @scale = scale || value.scale
-        when String
-          @value = BigDecimal(value)
-          @scale = scale || @value.scale
-        when Numeric
-          @value = BigDecimal(value.to_s)
-          @scale = scale || @value.scale
-        else
-          raise ArgumentError, "Value must be numeric or string, got #{value.class}"
-        end
-
-        # Ensure scale is non-negative
-        @scale = [@scale, 0].max
-      end
-
-      def to_d
-        @value
-      end
-
-      def to_f
-        @value.to_f
-      end
-
-      def to_s
-        @value.to_s("F")
-      end
-
-      attr_reader :scale
-
-      def unscaled_value
-        (@value * (10**@scale)).to_i
-      end
-
-      def inspect
-        "Decimal(#{@value}, scale: #{@scale})"
-      end
-
-      def method_missing(method, ...)
-        result = @value.send(method, ...)
-        if result.is_a?(BigDecimal) && ![:==, :<=>, :<, :<=, :>, :>=, :eql?, :hash].include?(method)
-          self.class.new(result, @scale)
-        else
-          result
-        end
-      end
-
-      def respond_to_missing?(method, include_private = false)
-        @value.respond_to?(method, include_private) || super
-      end
-
-      def ==(other)
-        @value == case other
-        when Decimal
-          other.to_d
-        when BigDecimal
-          other
-        else
-          BigDecimal(other.to_s)
-        end
-      end
-
-      def <=>(other)
-        @value <=> case other
-        when Decimal
-          other.to_d
-        when BigDecimal
-          other
-        else
-          BigDecimal(other.to_s)
-        end
-      end
-
-      def coerce(other)
-        [BigDecimal(other.to_s), @value]
-      end
-
-      # Marker method to identify as a typed decimal
-      def cassandra_typed_decimal?
-        true
-      end
-    end
-
-    # UUID type - Cassandra UUID
-    class Uuid
-      def initialize(value)
-        case value
-        when String
-          # Validate UUID format
-          unless uuid_format?(value)
-            raise ArgumentError, "Invalid UUID format: #{value}"
-          end
-          @value = value.downcase
-        else
-          raise ArgumentError, "Value must be a string, got #{value.class}"
-        end
-      end
-
-      def to_s
-        @value
-      end
-
-      def inspect
-        "Uuid(#{@value})"
-      end
-
-      def ==(other)
-        case other
-        when Uuid
-          @value == other.to_s
-        when String
-          @value == other.downcase
-        else
-          false
-        end
-      end
-
-      def <=>(other)
-        case other
-        when Uuid
-          @value <=> other.to_s
-        when String
-          @value <=> other.downcase
-        end
-      end
-
-      def hash
-        @value.hash
-      end
-
-      def eql?(other)
-        other.is_a?(Uuid) && @value == other.to_s
-      end
-
-      # Marker method to identify as a UUID
-      def cassandra_typed_uuid?
-        true
-      end
-
-      # Generate a random UUID v4
-      def self.generate
-        new(SecureRandom.uuid)
-      end
-
-      private
-
-      def uuid_format?(str)
-        !!(str =~ /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i)
-      end
-    end
-
-    # TimeUUID type - Cassandra TIMEUUID (version 1 UUID)
     class TimeUuid
-      def initialize(value = nil)
-        if value.nil?
-          @value = self.class.generate.to_s
-        else
-          case value
-          when String
-            # Validate UUID format and version 1
-            unless uuid_format?(value) && timeuuid_version?(value)
-              raise ArgumentError, "Invalid TimeUUID format: #{value}"
-            end
-            @value = value.downcase
-          when Time
-            @value = self.class.from_time(value).to_s
-          else
-            raise ArgumentError, "Value must be a string, Time, or nil, got #{value.class}"
-          end
-        end
+      attr_reader :uuid_string
+
+      def initialize(uuid_string)
+        @uuid_string = validate_timeuuid(uuid_string.to_s.downcase)
+      end
+
+      def self.generate
+        # This will be implemented in C extension
+        raise NotImplementedError, "TimeUuid.generate not yet implemented"
+      end
+
+      def self.from_time(time)
+        # This will be implemented in C extension
+        raise NotImplementedError, "TimeUuid.from_time not yet implemented"
       end
 
       def to_s
-        @value
+        @uuid_string
       end
 
-      def inspect
-        "TimeUuid(#{@value})"
-      end
-
-      def ==(other)
-        case other
-        when TimeUuid
-          @value == other.to_s
-        when String
-          @value == other.downcase
-        else
-          false
-        end
-      end
-
-      def <=>(other)
-        case other
-        when TimeUuid
-          @value <=> other.to_s
-        when String
-          @value <=> other.downcase
-        end
-      end
-
-      def hash
-        @value.hash
-      end
-
-      def eql?(other)
-        other.is_a?(TimeUuid) && @value == other.to_s
-      end
-
-      # Extract timestamp from TimeUUID
       def timestamp
-        # TimeUUID (version 1) contains timestamp in 100-nanosecond intervals
-        # since UUID epoch (October 15, 1582)
-        time_low = @value[0, 8].to_i(16)
-        time_mid = @value[9, 4].to_i(16)
-        time_hi = @value[14, 4].to_i(16) & 0x0FFF # Remove version bits
-
-        # Combine into 60-bit timestamp
-        uuid_time = (time_hi << 48) | (time_mid << 32) | time_low
-
-        # Convert from UUID epoch to Unix epoch
-        # UUID epoch: Oct 15, 1582 00:00:00 UTC
-        # Unix epoch: Jan 1, 1970 00:00:00 UTC
-        # Difference: 122192928000000000 (100-nanosecond intervals)
-        unix_time_100ns = uuid_time - 0x01B21DD213814000
-
-        # Convert to seconds and microseconds
-        unix_seconds = unix_time_100ns / 10_000_000
-        microseconds = (unix_time_100ns % 10_000_000) / 10
-
-        Time.at(unix_seconds, microseconds)
+        # This will be implemented in C extension
+        raise NotImplementedError, "TimeUuid#timestamp not yet implemented"
       end
 
-      # Marker method to identify as a TimeUUID
+      def to_time
+        timestamp
+      end
+
       def cassandra_typed_timeuuid?
         true
       end
 
-      # Generate a new TimeUUID for current time
-      def self.generate(timestamp = Time.now)
-        from_time(timestamp)
+      def ==(other)
+        case other
+        when TimeUuid
+          @uuid_string == other.uuid_string
+        when String
+          @uuid_string == other.downcase
+        else
+          false
+        end
       end
 
-      # Generate TimeUUID from specific timestamp
-      def self.from_time(timestamp)
-        # Convert Unix timestamp to UUID timestamp (100-nanosecond intervals since UUID epoch)
-        unix_time_100ns = (timestamp.to_f * 10_000_000).to_i
-        uuid_time = unix_time_100ns + 0x01B21DD213814000
-
-        # Extract time components
-        time_low = uuid_time & 0xFFFFFFFF
-        time_mid = (uuid_time >> 32) & 0xFFFF
-        time_hi = ((uuid_time >> 48) & 0x0FFF) | 0x1000 # Version 1
-
-        # Generate random clock sequence and node
-        clock_seq = SecureRandom.random_number(0x4000) | 0x8000 # Variant bits
-        node = SecureRandom.random_number(0x1000000000000) | 0x010000000000 # Multicast bit
-
-        # Format as UUID string
-        uuid_str = sprintf("%08x-%04x-%04x-%04x-%012x",
-          time_low, time_mid, time_hi, clock_seq, node)
-
-        new(uuid_str)
+      def hash
+        @uuid_string.hash
       end
 
       private
 
-      def uuid_format?(str)
-        !!(str =~ /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i)
-      end
+      def validate_timeuuid(uuid_str)
+        # Basic UUID format validation
+        unless uuid_str.match?(/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/)
+          raise ArgumentError, "Invalid UUID format: #{uuid_str}"
+        end
 
-      def timeuuid_version?(str)
-        # Check if it's version 1 (time-based UUID)
-        version_char = str[14]
-        version_char == "1"
+        # Check if it's a version 1 UUID (TimeUUID)
+        version = uuid_str[14].to_i(16)
+        unless version == 1
+          raise ArgumentError, "UUID must be version 1 (TimeUUID), got version #{version}"
+        end
+
+        uuid_str
       end
     end
-  end
-end
-
-# Add conversion methods to Integer
-class Integer
-  def to_cassandra_tinyint
-    CassandraC::Types::TinyInt.new(self)
-  end
-
-  def to_cassandra_smallint
-    CassandraC::Types::SmallInt.new(self)
-  end
-
-  def to_cassandra_int
-    CassandraC::Types::Int.new(self)
-  end
-
-  def to_cassandra_bigint
-    CassandraC::Types::BigInt.new(self)
-  end
-
-  def to_cassandra_varint
-    CassandraC::Types::VarInt.new(self)
-  end
-
-  def to_cassandra_float
-    CassandraC::Types::Float.new(self)
-  end
-
-  def to_cassandra_double
-    CassandraC::Types::Double.new(self)
-  end
-
-  def to_cassandra_decimal(scale = nil)
-    CassandraC::Types::Decimal.new(self, scale)
-  end
-end
-
-# Add conversion methods to Float
-class Float
-  def to_cassandra_float
-    CassandraC::Types::Float.new(self)
-  end
-
-  def to_cassandra_double
-    CassandraC::Types::Double.new(self)
-  end
-
-  def to_cassandra_decimal(scale = nil)
-    CassandraC::Types::Decimal.new(self, scale)
-  end
-end
-
-# Add conversion methods to String
-class String
-  def to_cassandra_decimal(scale = nil)
-    CassandraC::Types::Decimal.new(self, scale)
-  end
-end
-
-# Add conversion methods to BigDecimal
-class BigDecimal
-  def to_cassandra_decimal(scale = nil)
-    CassandraC::Types::Decimal.new(self, scale)
-  end
-end
-
-# Add conversion methods to String
-class String
-  def to_cassandra_uuid
-    CassandraC::Types::Uuid.new(self)
-  end
-
-  def to_cassandra_timeuuid
-    CassandraC::Types::TimeUuid.new(self)
-  end
-end
-
-# Add conversion methods to Time
-class Time
-  def to_cassandra_timeuuid
-    CassandraC::Types::TimeUuid.new(self)
   end
 end
