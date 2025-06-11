@@ -80,7 +80,7 @@ class PerformanceAnalyzer
 
     # Test insert performance
     insert_c_time = benchmark_operation("CassandraC INSERT") do
-      stmt = CassandraC::Native::Statement.new("INSERT INTO test_table (id, text_col, int_col) VALUES (?, ?, ?)", 3)
+      stmt = CassandraC::Native::Statement.new("INSERT INTO perf_test.test_table (id, text_col, int_col) VALUES (?, ?, ?)", 3)
       stmt.bind_by_index(0, "test_#{rand(10000)}")
       stmt.bind_by_index(1, "Sample text")
       stmt.bind_by_index(2, 42.to_cassandra_int)
@@ -88,17 +88,17 @@ class PerformanceAnalyzer
     end
 
     insert_driver_time = benchmark_operation("cassandra-driver INSERT") do
-      cassandra_driver_session.execute("INSERT INTO test_table (id, text_col, int_col) VALUES (?, ?, ?)",
+      cassandra_driver_session.execute("INSERT INTO perf_test.test_table (id, text_col, int_col) VALUES (?, ?, ?)",
         arguments: ["test_#{rand(10000)}", "Sample text", 42])
     end
 
     # Test select performance
     select_c_time = benchmark_operation("CassandraC SELECT") do
-      cassandra_c_session.execute("SELECT * FROM test_table LIMIT 10")
+      cassandra_c_session.execute("SELECT * FROM perf_test.test_table LIMIT 10")
     end
 
     select_driver_time = benchmark_operation("cassandra-driver SELECT") do
-      cassandra_driver_session.execute("SELECT * FROM test_table LIMIT 10")
+      cassandra_driver_session.execute("SELECT * FROM perf_test.test_table LIMIT 10")
     end
 
     puts "📝 INSERT Operations:"
@@ -123,20 +123,16 @@ class PerformanceAnalyzer
     # Test statement creation memory usage
     puts "Testing statement creation overhead..."
 
-    c_memory = nil
-    driver_memory = nil
-
     MemoryProfiler.profile("CassandraC Statement Creation (1000x)") do
       1000.times do
-        stmt = CassandraC::Native::Statement.new("SELECT * FROM test WHERE id = ?", 1)
+        stmt = CassandraC::Native::Statement.new("SELECT * FROM perf_test.test WHERE id = ?", 1)
         stmt.bind_by_index(0, "test")
       end
     end
 
     MemoryProfiler.profile("cassandra-driver Equivalent (1000x)") do
       1000.times do
-        query = "SELECT * FROM test WHERE id = ?"
-        args = ["test"]
+        "test" # Simulate argument preparation
       end
     end
 
@@ -170,7 +166,7 @@ class PerformanceAnalyzer
       thread_count.times do |i|
         threads << Thread.new do
           operations_per_thread.times do |j|
-            stmt = CassandraC::Native::Statement.new("INSERT INTO test_table (id, text_col) VALUES (?, ?)", 2)
+            stmt = CassandraC::Native::Statement.new("INSERT INTO perf_test.test_table (id, text_col) VALUES (?, ?)", 2)
             stmt.bind_by_index(0, "concurrent_c_#{i}_#{j}_#{rand(10000)}")
             stmt.bind_by_index(1, "test")
             cassandra_c_session.execute(stmt)
@@ -187,7 +183,7 @@ class PerformanceAnalyzer
         threads << Thread.new do
           operations_per_thread.times do |j|
             cassandra_driver_session.execute(
-              "INSERT INTO test_table (id, text_col) VALUES (?, ?)",
+              "INSERT INTO perf_test.test_table (id, text_col) VALUES (?, ?)",
               arguments: ["concurrent_d_#{i}_#{j}_#{rand(10000)}", "test"]
             )
           end

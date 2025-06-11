@@ -1,7 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require "bundler/setup"
+# Add current directory to load path for standalone execution
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
 
 puts "Cassandra Performance Benchmark Runner"
 puts "=" * 50
@@ -43,9 +44,12 @@ rescue LoadError => e
     puts "  gem install cassandra-driver"
     puts ""
     puts "This gem is not included as a default dependency."
+  elsif e.message.include?("benchmark/ips")
+    puts "Install the benchmark-ips gem:"
+    puts "  gem install benchmark-ips"
   else
-    puts "Install benchmark dependencies:"
-    puts "  bundle install"
+    puts "Missing required gems. Install with:"
+    puts "  gem install benchmark-ips cassandra-driver"
   end
   exit 1
 end

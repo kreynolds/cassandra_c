@@ -87,25 +87,27 @@ class MemoryProfiler
     results
   end
 
-  private
+  class << self
+    private
 
-  def self.memory_usage_kb
-    if RUBY_PLATFORM.match?(/darwin|mac os/)
-      # macOS
-      `ps -o rss= -p #{Process.pid}`.to_i
-    elsif RUBY_PLATFORM.match?(/linux/)
-      # Linux - read from /proc/self/status
-      status = File.read("/proc/self/status")
-      if match = status.match(/VmRSS:\s+(\d+) kB/)
-        match[1].to_i
+    def memory_usage_kb
+      if RUBY_PLATFORM.match?(/darwin|mac os/)
+        # macOS
+        `ps -o rss= -p #{Process.pid}`.to_i
+      elsif RUBY_PLATFORM.match?(/linux/)
+        # Linux - read from /proc/self/status
+        status = File.read("/proc/self/status")
+        if (match = status.match(/VmRSS:\s+(\d+) kB/))
+          match[1].to_i
+        else
+          0
+        end
       else
-        0
+        # Fallback: try ps command
+        `ps -o rss= -p #{Process.pid}`.to_i
       end
-    else
-      # Fallback: try ps command
-      `ps -o rss= -p #{Process.pid}`.to_i
+    rescue
+      0
     end
-  rescue
-    0
   end
 end

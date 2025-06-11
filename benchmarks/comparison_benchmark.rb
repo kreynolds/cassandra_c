@@ -1,13 +1,15 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require "bundler/setup"
+# Add current directory to load path for standalone execution
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+
 require "benchmark/ips"
 require "cassandra_c"
 require "securerandom"
-
 require "sorted_set"
 
+# Try to load cassandra-driver without bundler
 begin
   require "cassandra"
 rescue LoadError
@@ -104,8 +106,8 @@ class BenchmarkRunner
         bigint_col BIGINT,
         float_col FLOAT,
         boolean_col BOOLEAN,
-        list_col LIST<INT>,
-        set_col SET<INT>,
+        list_col LIST<BIGINT>,
+        set_col SET<BIGINT>,
         map_col MAP<TEXT, TEXT>
       )
     SQL
@@ -154,8 +156,8 @@ class BenchmarkRunner
     puts "2. Basic Query Operations"
     puts "=" * 50
 
-    simple_insert = "INSERT INTO test_table (id, text_col) VALUES (?, ?)"
-    simple_select = "SELECT * FROM test_table LIMIT 1"
+    simple_insert = "INSERT INTO benchmark_test.test_table (id, text_col) VALUES (?, ?)"
+    simple_select = "SELECT * FROM benchmark_test.test_table LIMIT 1"
 
     Benchmark.ips do |x|
       x.config(time: 5, warmup: 2)
@@ -190,7 +192,7 @@ class BenchmarkRunner
     puts "=" * 50
 
     insert_cql = <<~SQL
-      INSERT INTO test_table (id, text_col, int_col, bigint_col, float_col, boolean_col)
+      INSERT INTO benchmark_test.test_table (id, text_col, int_col, bigint_col, float_col, boolean_col)
       VALUES (?, ?, ?, ?, ?, ?)
     SQL
 
@@ -221,7 +223,7 @@ class BenchmarkRunner
           SAMPLE_DATA[:bigint_data],
           SAMPLE_DATA[:float_data],
           SAMPLE_DATA[:boolean_data]
-        ])
+        ], type_hints: [nil, nil, Cassandra::Types::Int, Cassandra::Types::Bigint, Cassandra::Types::Float, nil])
       end
 
       x.compare!
@@ -233,7 +235,7 @@ class BenchmarkRunner
     puts "4. Batch Operation Performance"
     puts "=" * 50
 
-    insert_cql = "INSERT INTO test_table (id, text_col, int_col) VALUES (?, ?, ?)"
+    insert_cql = "INSERT INTO benchmark_test.test_table (id, text_col, int_col) VALUES (?, ?, ?)"
 
     Benchmark.ips do |x|
       x.config(time: 5, warmup: 2)
@@ -260,7 +262,7 @@ class BenchmarkRunner
             SecureRandom.uuid.to_s,
             SAMPLE_DATA[:text_data],
             SAMPLE_DATA[:int_data]
-          ])
+          ], type_hints: [nil, nil, Cassandra::Types::Int])
         end
 
         @cassandra_driver_session.execute(batch)
@@ -319,7 +321,7 @@ class BenchmarkRunner
     puts "=" * 50
 
     collection_insert = <<~SQL
-      INSERT INTO test_table (id, list_col, set_col, map_col) VALUES (?, ?, ?, ?)
+      INSERT INTO benchmark_test.test_table (id, list_col, set_col, map_col) VALUES (?, ?, ?, ?)
     SQL
 
     Benchmark.ips do |x|
@@ -353,7 +355,7 @@ class BenchmarkRunner
     puts "=" * 50
 
     # Insert test data first
-    insert_cql = "INSERT INTO test_table (id, text_col, int_col, bigint_col) VALUES (?, ?, ?, ?)"
+    insert_cql = "INSERT INTO benchmark_test.test_table (id, text_col, int_col, bigint_col) VALUES (?, ?, ?, ?)"
 
     # Insert 100 rows for testing
     100.times do |i|
@@ -365,7 +367,7 @@ class BenchmarkRunner
       @cassandra_c_session.execute(stmt)
     end
 
-    select_cql = "SELECT * FROM test_table LIMIT 50"
+    select_cql = "SELECT * FROM benchmark_test.test_table LIMIT 50"
 
     Benchmark.ips do |x|
       x.config(time: 5, warmup: 2)
@@ -411,7 +413,7 @@ class BenchmarkRunner
     puts "8. Concurrent Operations Performance"
     puts "=" * 50
 
-    insert_cql = "INSERT INTO test_table (id, text_col, int_col) VALUES (?, ?, ?)"
+    insert_cql = "INSERT INTO benchmark_test.test_table (id, text_col, int_col) VALUES (?, ?, ?)"
 
     Benchmark.ips do |x|
       x.config(time: 5, warmup: 2)
@@ -441,7 +443,7 @@ class BenchmarkRunner
                 "thread_#{thread_id}_#{i}_#{SecureRandom.uuid}",
                 "Concurrent text #{thread_id}",
                 i
-              ])
+              ], type_hints: [nil, nil, Cassandra::Types::Int])
             end
           end
         end
@@ -463,7 +465,7 @@ class BenchmarkRunner
 
     MemoryProfiler.profile("CassandraC Statement Creation") do
       1000.times do
-        stmt = CassandraC::Native::Statement.new("SELECT * FROM test_table WHERE id = ?", 1)
+        stmt = CassandraC::Native::Statement.new("SELECT * FROM benchmark_test.test_table WHERE id = ?", 1)
         stmt.bind_by_index(0, SecureRandom.uuid.to_s)
       end
     end
@@ -471,8 +473,7 @@ class BenchmarkRunner
     MemoryProfiler.profile("cassandra-driver Equivalent Operations") do
       1000.times do
         # Simulate equivalent operations (cassandra-driver doesn't pre-create statements)
-        query = "SELECT * FROM test_table WHERE id = ?"
-        args = [SecureRandom.uuid.to_s]
+        SecureRandom.uuid.to_s # Simulate argument preparation
       end
     end
 
@@ -482,7 +483,7 @@ class BenchmarkRunner
       10.times do
         batch = CassandraC::Native::Batch.new(:unlogged)
         20.times do
-          stmt = CassandraC::Native::Statement.new("INSERT INTO test_table (id, text_col) VALUES (?, ?)", 2)
+          stmt = CassandraC::Native::Statement.new("INSERT INTO benchmark_test.test_table (id, text_col) VALUES (?, ?)", 2)
           stmt.bind_by_index(0, SecureRandom.uuid.to_s)
           stmt.bind_by_index(1, "test")
           batch.add(stmt)
@@ -495,7 +496,7 @@ class BenchmarkRunner
       10.times do
         batch = @cassandra_driver_session.unlogged_batch
         20.times do
-          batch.add("INSERT INTO test_table (id, text_col) VALUES (?, ?)",
+          batch.add("INSERT INTO benchmark_test.test_table (id, text_col) VALUES (?, ?)",
             arguments: [SecureRandom.uuid.to_s, "test"])
         end
         @cassandra_driver_session.execute(batch)
@@ -535,6 +536,28 @@ end
 
 # Run benchmarks if this file is executed directly
 if __FILE__ == $0
+  if ARGV.include?("--help") || ARGV.include?("-h")
+    puts "Cassandra Performance Benchmarks"
+    puts "Usage: ruby comparison_benchmark.rb [options]"
+    puts
+    puts "Options:"
+    puts "  --help, -h     Show this help message"
+    puts "  --dry-run      Test dependencies without running benchmarks"
+    puts
+    puts "Requirements:"
+    puts "  - Cassandra running on localhost:9042"
+    puts "  - cassandra-driver gem installed (gem install cassandra-driver)"
+    exit 0
+  end
+
+  if ARGV.include?("--dry-run")
+    puts "\u2705 CassandraC gem loaded successfully"
+    puts "\u2705 cassandra-driver gem loaded successfully"
+    puts "\u2705 All dependencies available"
+    puts "\nRun without --dry-run to execute benchmarks (requires Cassandra running)"
+    exit 0
+  end
+
   puts "Starting Cassandra Performance Benchmarks..."
   puts "Ensure Cassandra is running on localhost:9042"
   puts
