@@ -46,11 +46,7 @@ static void init_type_classes() {
         cDecimal = rb_const_get(mTypes, rb_intern("Decimal"));
         cUuid = rb_const_get(mTypes, rb_intern("Uuid"));
         cTimeUuid = rb_const_get(mTypes, rb_intern("TimeUuid"));
-<<<<<<< HEAD
         type_classes_initialized = 1;
-        cDate = rb_const_get(mTypes, rb_intern("Date"));
-=======
->>>>>>> 1769976 (Refactor date/time types for natural Ruby API)
         cTime = rb_const_get(mTypes, rb_intern("Time"));
     }
 }
