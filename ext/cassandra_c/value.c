@@ -1382,6 +1382,9 @@ static CassValueType ruby_symbol_to_cass_value_type(VALUE type_symbol) {
     if (type_id == rb_intern("uuid")) return CASS_VALUE_TYPE_UUID;
     if (type_id == rb_intern("timeuuid")) return CASS_VALUE_TYPE_TIMEUUID;
     if (type_id == rb_intern("inet")) return CASS_VALUE_TYPE_INET;
+    if (type_id == rb_intern("date")) return CASS_VALUE_TYPE_DATE;
+    if (type_id == rb_intern("time")) return CASS_VALUE_TYPE_TIME;
+    if (type_id == rb_intern("timestamp")) return CASS_VALUE_TYPE_TIMESTAMP;
     
     return CASS_VALUE_TYPE_UNKNOWN;
 }
@@ -1779,6 +1782,15 @@ static CassError bind_value_with_type_hint(CassStatement* statement, size_t inde
         case CASS_VALUE_TYPE_TIMEUUID: {
             return ruby_value_to_cass_timeuuid(statement, index, rb_value);
         }
+        case CASS_VALUE_TYPE_DATE: {
+            return ruby_value_to_cass_date(statement, index, rb_value);
+        }
+        case CASS_VALUE_TYPE_TIME: {
+            return ruby_value_to_cass_time(statement, index, rb_value);
+        }
+        case CASS_VALUE_TYPE_TIMESTAMP: {
+            return ruby_value_to_cass_timestamp(statement, index, rb_value);
+        }
         default: {
             // Fall back to default binding behavior
             return ruby_value_to_cass_statement(statement, index, rb_value);
@@ -1852,6 +1864,15 @@ static CassError bind_value_with_type_hint_by_name(CassStatement* statement, con
         case CASS_VALUE_TYPE_TIMEUUID: {
             return ruby_value_to_cass_timeuuid_by_name(statement, name, rb_value);
         }
+        case CASS_VALUE_TYPE_DATE: {
+            return ruby_value_to_cass_date_by_name(statement, name, rb_value);
+        }
+        case CASS_VALUE_TYPE_TIME: {
+            return ruby_value_to_cass_time_by_name(statement, name, rb_value);
+        }
+        case CASS_VALUE_TYPE_TIMESTAMP: {
+            return ruby_value_to_cass_timestamp_by_name(statement, name, rb_value);
+        }
         default: {
             // Fall back to default binding behavior
             return ruby_value_to_cass_statement_by_name(statement, name, rb_value);
@@ -1913,4 +1934,151 @@ CassError ruby_value_to_cass_statement_with_type_by_name(CassStatement* statemen
     }
     
     return bind_value_with_type_hint_by_name(statement, name, rb_value, type);
+}
+
+// ============================================================================
+// Date/Time Binding Functions  
+// ============================================================================
+
+// Type-specific binding functions for date (days since Unix epoch)
+CassError ruby_value_to_cass_date(CassStatement* statement, size_t index, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null(statement, index);
+    }
+    
+    cass_uint32_t date_days;
+    
+    // Handle Ruby Date objects directly
+    VALUE date_class = rb_const_get(rb_cObject, rb_intern("Date"));
+    if (rb_obj_is_kind_of(rb_value, date_class)) {
+        // Convert Ruby Date to days since Unix epoch
+        VALUE epoch_date = rb_funcall(date_class, rb_intern("new"), 3, INT2NUM(1970), INT2NUM(1), INT2NUM(1));
+        VALUE days_diff = rb_funcall(rb_value, rb_intern("-"), 1, epoch_date);
+        date_days = (cass_uint32_t)NUM2UINT(rb_funcall(days_diff, rb_intern("to_i"), 0));
+    } else if (FIXNUM_P(rb_value) || TYPE(rb_value) == T_BIGNUM) {
+        date_days = (cass_uint32_t)NUM2UINT(rb_value);
+    } else {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    return cass_statement_bind_uint32(statement, index, date_days);
+}
+
+CassError ruby_value_to_cass_date_by_name(CassStatement* statement, const char* name, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null_by_name(statement, name);
+    }
+    
+    cass_uint32_t date_days;
+    
+    // Handle Ruby Date objects directly
+    VALUE date_class = rb_const_get(rb_cObject, rb_intern("Date"));
+    if (rb_obj_is_kind_of(rb_value, date_class)) {
+        // Convert Ruby Date to days since Unix epoch
+        VALUE epoch_date = rb_funcall(date_class, rb_intern("new"), 3, INT2NUM(1970), INT2NUM(1), INT2NUM(1));
+        VALUE days_diff = rb_funcall(rb_value, rb_intern("-"), 1, epoch_date);
+        date_days = (cass_uint32_t)NUM2UINT(rb_funcall(days_diff, rb_intern("to_i"), 0));
+    } else if (FIXNUM_P(rb_value) || TYPE(rb_value) == T_BIGNUM) {
+        date_days = (cass_uint32_t)NUM2UINT(rb_value);
+    } else {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    return cass_statement_bind_uint32_by_name(statement, name, date_days);
+}
+
+// Type-specific binding functions for time (nanoseconds since midnight)
+CassError ruby_value_to_cass_time(CassStatement* statement, size_t index, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null(statement, index);
+    }
+    
+    cass_int64_t time_nanos;
+    
+    // Handle CassandraC::Types::Time objects
+    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
+    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
+    VALUE cTime = rb_const_get(mTypes, rb_intern("Time"));
+    
+    if (rb_obj_is_kind_of(rb_value, cTime)) {
+        VALUE nanos_value = rb_funcall(rb_value, rb_intern("nanoseconds_since_midnight"), 0);
+        time_nanos = (cass_int64_t)NUM2LL(nanos_value);
+    } else if (FIXNUM_P(rb_value) || TYPE(rb_value) == T_BIGNUM) {
+        time_nanos = (cass_int64_t)NUM2LL(rb_value);
+    } else {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    return cass_statement_bind_int64(statement, index, time_nanos);
+}
+
+CassError ruby_value_to_cass_time_by_name(CassStatement* statement, const char* name, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null_by_name(statement, name);
+    }
+    
+    cass_int64_t time_nanos;
+    
+    // Handle CassandraC::Types::Time objects
+    VALUE mCassandraC = rb_const_get(rb_cObject, rb_intern("CassandraC"));
+    VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
+    VALUE cTime = rb_const_get(mTypes, rb_intern("Time"));
+    
+    if (rb_obj_is_kind_of(rb_value, cTime)) {
+        VALUE nanos_value = rb_funcall(rb_value, rb_intern("nanoseconds_since_midnight"), 0);
+        time_nanos = (cass_int64_t)NUM2LL(nanos_value);
+    } else if (FIXNUM_P(rb_value) || TYPE(rb_value) == T_BIGNUM) {
+        time_nanos = (cass_int64_t)NUM2LL(rb_value);
+    } else {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    return cass_statement_bind_int64_by_name(statement, name, time_nanos);
+}
+
+// Type-specific binding functions for timestamp (milliseconds since Unix epoch)
+CassError ruby_value_to_cass_timestamp(CassStatement* statement, size_t index, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null(statement, index);
+    }
+    
+    cass_int64_t timestamp_millis;
+    
+    // Handle Ruby Time objects directly
+    VALUE time_class = rb_const_get(rb_cObject, rb_intern("Time"));
+    if (rb_obj_is_kind_of(rb_value, time_class)) {
+        // Convert Ruby Time to milliseconds since Unix epoch
+        VALUE time_float = rb_funcall(rb_value, rb_intern("to_f"), 0);
+        double time_seconds = NUM2DBL(time_float);
+        timestamp_millis = (cass_int64_t)(time_seconds * 1000.0);
+    } else if (FIXNUM_P(rb_value) || TYPE(rb_value) == T_BIGNUM) {
+        timestamp_millis = (cass_int64_t)NUM2LL(rb_value);
+    } else {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    return cass_statement_bind_int64(statement, index, timestamp_millis);
+}
+
+CassError ruby_value_to_cass_timestamp_by_name(CassStatement* statement, const char* name, VALUE rb_value) {
+    if (NIL_P(rb_value)) {
+        return cass_statement_bind_null_by_name(statement, name);
+    }
+    
+    cass_int64_t timestamp_millis;
+    
+    // Handle Ruby Time objects directly
+    VALUE time_class = rb_const_get(rb_cObject, rb_intern("Time"));
+    if (rb_obj_is_kind_of(rb_value, time_class)) {
+        // Convert Ruby Time to milliseconds since Unix epoch
+        VALUE time_float = rb_funcall(rb_value, rb_intern("to_f"), 0);
+        double time_seconds = NUM2DBL(time_float);
+        timestamp_millis = (cass_int64_t)(time_seconds * 1000.0);
+    } else if (FIXNUM_P(rb_value) || TYPE(rb_value) == T_BIGNUM) {
+        timestamp_millis = (cass_int64_t)NUM2LL(rb_value);
+    } else {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    }
+    
+    return cass_statement_bind_int64_by_name(statement, name, timestamp_millis);
 }

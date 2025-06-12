@@ -126,6 +126,12 @@ CassError ruby_value_to_cass_uuid(CassStatement* statement, size_t index, VALUE 
 CassError ruby_value_to_cass_uuid_by_name(CassStatement* statement, const char* name, VALUE rb_value);
 CassError ruby_value_to_cass_timeuuid(CassStatement* statement, size_t index, VALUE rb_value);
 CassError ruby_value_to_cass_timeuuid_by_name(CassStatement* statement, const char* name, VALUE rb_value);
+CassError ruby_value_to_cass_date(CassStatement* statement, size_t index, VALUE rb_value);
+CassError ruby_value_to_cass_date_by_name(CassStatement* statement, const char* name, VALUE rb_value);
+CassError ruby_value_to_cass_time(CassStatement* statement, size_t index, VALUE rb_value);
+CassError ruby_value_to_cass_time_by_name(CassStatement* statement, const char* name, VALUE rb_value);
+CassError ruby_value_to_cass_timestamp(CassStatement* statement, size_t index, VALUE rb_value);
+CassError ruby_value_to_cass_timestamp_by_name(CassStatement* statement, const char* name, VALUE rb_value);
 CassError ruby_value_to_cass_list(CassStatement* statement, size_t index, VALUE rb_value);
 CassError ruby_value_to_cass_list_by_name(CassStatement* statement, const char* name, VALUE rb_value);
 CassError ruby_value_to_cass_set(CassStatement* statement, size_t index, VALUE rb_value);

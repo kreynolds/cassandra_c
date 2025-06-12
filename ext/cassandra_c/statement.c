@@ -522,6 +522,129 @@ static VALUE rb_statement_bind_timeuuid_by_name(VALUE self, VALUE name, VALUE va
     return self;
 }
 
+// Bind a date value by index
+static VALUE rb_statement_bind_date_by_index(VALUE self, VALUE index, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    size_t param_index = NUM2SIZET(index);
+    CassError error = ruby_value_to_cass_date(wrapper->statement, param_index, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind date parameter at index %zu: %s", 
+                 param_index, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a date value by name
+static VALUE rb_statement_bind_date_by_name(VALUE self, VALUE name, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    Check_Type(name, T_STRING);
+    const char* param_name = StringValueCStr(name);
+    CassError error = ruby_value_to_cass_date_by_name(wrapper->statement, param_name, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind date parameter '%s': %s", 
+                 param_name, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a time value by index
+static VALUE rb_statement_bind_time_by_index(VALUE self, VALUE index, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    size_t param_index = NUM2SIZET(index);
+    CassError error = ruby_value_to_cass_time(wrapper->statement, param_index, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind time parameter at index %zu: %s", 
+                 param_index, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a time value by name
+static VALUE rb_statement_bind_time_by_name(VALUE self, VALUE name, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    Check_Type(name, T_STRING);
+    const char* param_name = StringValueCStr(name);
+    CassError error = ruby_value_to_cass_time_by_name(wrapper->statement, param_name, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind time parameter '%s': %s", 
+                 param_name, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a timestamp value by index
+static VALUE rb_statement_bind_timestamp_by_index(VALUE self, VALUE index, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    size_t param_index = NUM2SIZET(index);
+    CassError error = ruby_value_to_cass_timestamp(wrapper->statement, param_index, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind timestamp parameter at index %zu: %s", 
+                 param_index, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
+// Bind a timestamp value by name
+static VALUE rb_statement_bind_timestamp_by_name(VALUE self, VALUE name, VALUE value) {
+    StatementWrapper* wrapper;
+    TypedData_Get_Struct(self, StatementWrapper, &statement_type, wrapper);
+    
+    if (wrapper->statement == NULL) {
+        rb_raise(rb_eCassandraError, "Statement is NULL");
+    }
+    
+    Check_Type(name, T_STRING);
+    const char* param_name = StringValueCStr(name);
+    CassError error = ruby_value_to_cass_timestamp_by_name(wrapper->statement, param_name, value);
+    
+    if (error != CASS_OK) {
+        rb_raise(rb_eCassandraError, "Failed to bind timestamp parameter '%s': %s", 
+                 param_name, cass_error_desc(error));
+    }
+    
+    return self;
+}
+
 // Type-hinted collection binding methods
 
 // Bind a list value by index with element type hint
@@ -743,6 +866,12 @@ void Init_cassandra_c_statement(VALUE module) {
     rb_define_method(cCassStatement, "bind_uuid_by_name", rb_statement_bind_uuid_by_name, 2);
     rb_define_method(cCassStatement, "bind_timeuuid_by_index", rb_statement_bind_timeuuid_by_index, 2);
     rb_define_method(cCassStatement, "bind_timeuuid_by_name", rb_statement_bind_timeuuid_by_name, 2);
+    rb_define_method(cCassStatement, "bind_date_by_index", rb_statement_bind_date_by_index, 2);
+    rb_define_method(cCassStatement, "bind_date_by_name", rb_statement_bind_date_by_name, 2);
+    rb_define_method(cCassStatement, "bind_time_by_index", rb_statement_bind_time_by_index, 2);
+    rb_define_method(cCassStatement, "bind_time_by_name", rb_statement_bind_time_by_name, 2);
+    rb_define_method(cCassStatement, "bind_timestamp_by_index", rb_statement_bind_timestamp_by_index, 2);
+    rb_define_method(cCassStatement, "bind_timestamp_by_name", rb_statement_bind_timestamp_by_name, 2);
     
     // Type-hinted collection binding methods
     rb_define_method(cCassStatement, "bind_list_by_index", rb_statement_bind_list_by_index, -1);
