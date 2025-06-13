@@ -53,9 +53,13 @@ CassError ruby_value_to_cass_statement(CassStatement* statement, size_t index, V
             if (rb_obj_is_kind_of(rb_value, rb_cBigDecimal)) {
                 return ruby_value_to_cass_decimal(statement, index, rb_value);
             }
-            // Default integer handling - use bigint (int64) for all integers
-            cass_int64_t val = (cass_int64_t)NUM2LL(rb_value);
-            return cass_statement_bind_int64(statement, index, val);
+            // Default integer handling - use int32 for values that fit, int64 otherwise
+            long long val = NUM2LL(rb_value);
+            if (val >= INT32_MIN && val <= INT32_MAX) {
+                return cass_statement_bind_int32(statement, index, (cass_int32_t)val);
+            } else {
+                return cass_statement_bind_int64(statement, index, (cass_int64_t)val);
+            }
         }
         case T_HASH: {
             // Handle Ruby Hash as map
@@ -66,6 +70,22 @@ CassError ruby_value_to_cass_statement(CassStatement* statement, size_t index, V
             VALUE rb_cBigDecimal = rb_const_get(rb_cObject, rb_intern("BigDecimal"));
             if (rb_obj_is_kind_of(rb_value, rb_cBigDecimal)) {
                 return ruby_value_to_cass_decimal(statement, index, rb_value);
+            }
+            // Check if it's a Time object  
+            VALUE rb_cTime = rb_const_get(rb_cObject, rb_intern("Time"));
+            if (rb_obj_is_kind_of(rb_value, rb_cTime)) {
+                return ruby_value_to_cass_timestamp(statement, index, rb_value);
+            }
+            // Check if it's a Date object
+            if (rb_const_defined(rb_cObject, rb_intern("Date"))) {
+                VALUE rb_cDate = rb_const_get(rb_cObject, rb_intern("Date"));
+                if (rb_obj_is_kind_of(rb_value, rb_cDate)) {
+                    return ruby_value_to_cass_date(statement, index, rb_value);
+                }
+            }
+            // Check if it's a CassandraC::Native::TimeUuid object
+            if (rb_obj_is_kind_of(rb_value, cCassTimeUuid)) {
+                return ruby_value_to_cass_timeuuid(statement, index, rb_value);
             }
             // Fall through to default case for other T_DATA objects
         }
@@ -80,34 +100,27 @@ CassError ruby_value_to_cass_statement(CassStatement* statement, size_t index, V
             if (rb_obj_is_kind_of(rb_value, rb_cBigDecimal)) {
                 return ruby_value_to_cass_decimal(statement, index, rb_value);
             }
-            // Check if it's a Time object
+            // Check if it's a Time object  
             VALUE rb_cTime = rb_const_get(rb_cObject, rb_intern("Time"));
             if (rb_obj_is_kind_of(rb_value, rb_cTime)) {
-                // Convert Time to timestamp (bigint - milliseconds since epoch)
-                VALUE to_f_val = rb_funcall(rb_value, rb_intern("to_f"), 0);
-                double time_f = NUM2DBL(to_f_val);
-                cass_int64_t timestamp = (cass_int64_t)(time_f * 1000); // Convert to milliseconds
-                return cass_statement_bind_int64(statement, index, timestamp);
+                return ruby_value_to_cass_timestamp(statement, index, rb_value);
             }
-            // Check if it's a Date object (only if Date class is defined)
-            VALUE rb_cDate = Qnil;
+            // Check if it's a Date object
             if (rb_const_defined(rb_cObject, rb_intern("Date"))) {
-                rb_cDate = rb_const_get(rb_cObject, rb_intern("Date"));
+                VALUE rb_cDate = rb_const_get(rb_cObject, rb_intern("Date"));
                 if (rb_obj_is_kind_of(rb_value, rb_cDate)) {
-                    // Convert Date to string representation
-                    VALUE str_val = rb_funcall(rb_value, rb_intern("to_s"), 0);
-                    const char* str = RSTRING_PTR(str_val);
-                    size_t len = RSTRING_LEN(str_val);
-                    return cass_statement_bind_string_n(statement, index, str, len);
+                    return ruby_value_to_cass_date(statement, index, rb_value);
                 }
             }
-            // Check if it's a TimeUuid object - for now, check by class name
-            VALUE rb_class = rb_obj_class(rb_value);
-            VALUE class_name = rb_funcall(rb_class, rb_intern("name"), 0);
-            if (rb_str_equal(class_name, rb_str_new_cstr("CassandraC::Types::TimeUuid"))) {
-                // Convert TimeUuid to string and bind as timeuuid
-                VALUE str_val = rb_funcall(rb_value, rb_intern("to_s"), 0);
-                return ruby_value_to_cass_timeuuid(statement, index, str_val);
+            // Check if it's a CassandraC::Native::TimeUuid object
+            if (rb_obj_is_kind_of(rb_value, cCassTimeUuid)) {
+                return ruby_value_to_cass_timeuuid(statement, index, rb_value);
+            }
+            // Check if it's a CassandraC::Types::Time object
+            VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
+            VALUE time_type_class = rb_const_get(mTypes, rb_intern("Time"));
+            if (rb_obj_is_kind_of(rb_value, time_type_class)) {
+                return ruby_value_to_cass_time(statement, index, rb_value);
             }
             // Fall through to default case for other objects
         }
@@ -152,9 +165,13 @@ CassError ruby_value_to_cass_statement_by_name(CassStatement* statement, const c
             if (rb_obj_is_kind_of(rb_value, rb_cBigDecimal)) {
                 return ruby_value_to_cass_decimal_by_name(statement, name, rb_value);
             }
-            // Default integer handling - use bigint (int64) for all integers
-            cass_int64_t val = (cass_int64_t)NUM2LL(rb_value);
-            return cass_statement_bind_int64_by_name(statement, name, val);
+            // Default integer handling - use int32 for values that fit, int64 otherwise
+            long long val = NUM2LL(rb_value);
+            if (val >= INT32_MIN && val <= INT32_MAX) {
+                return cass_statement_bind_int32_by_name(statement, name, (cass_int32_t)val);
+            } else {
+                return cass_statement_bind_int64_by_name(statement, name, (cass_int64_t)val);
+            }
         }
         case T_HASH: {
             // Handle Ruby Hash as map
@@ -165,6 +182,22 @@ CassError ruby_value_to_cass_statement_by_name(CassStatement* statement, const c
             VALUE rb_cBigDecimal = rb_const_get(rb_cObject, rb_intern("BigDecimal"));
             if (rb_obj_is_kind_of(rb_value, rb_cBigDecimal)) {
                 return ruby_value_to_cass_decimal_by_name(statement, name, rb_value);
+            }
+            // Check if it's a Time object
+            VALUE rb_cTime = rb_const_get(rb_cObject, rb_intern("Time"));
+            if (rb_obj_is_kind_of(rb_value, rb_cTime)) {
+                return ruby_value_to_cass_timestamp_by_name(statement, name, rb_value);
+            }
+            // Check if it's a Date object
+            if (rb_const_defined(rb_cObject, rb_intern("Date"))) {
+                VALUE rb_cDate = rb_const_get(rb_cObject, rb_intern("Date"));
+                if (rb_obj_is_kind_of(rb_value, rb_cDate)) {
+                    return ruby_value_to_cass_date_by_name(statement, name, rb_value);
+                }
+            }
+            // Check if it's a CassandraC::Native::TimeUuid object
+            if (rb_obj_is_kind_of(rb_value, cCassTimeUuid)) {
+                return ruby_value_to_cass_timeuuid_by_name(statement, name, rb_value);
             }
             // Fall through to default case for other T_DATA objects
         }
@@ -182,31 +215,24 @@ CassError ruby_value_to_cass_statement_by_name(CassStatement* statement, const c
             // Check if it's a Time object
             VALUE rb_cTime = rb_const_get(rb_cObject, rb_intern("Time"));
             if (rb_obj_is_kind_of(rb_value, rb_cTime)) {
-                // Convert Time to timestamp (bigint - milliseconds since epoch)
-                VALUE to_f_val = rb_funcall(rb_value, rb_intern("to_f"), 0);
-                double time_f = NUM2DBL(to_f_val);
-                cass_int64_t timestamp = (cass_int64_t)(time_f * 1000); // Convert to milliseconds
-                return cass_statement_bind_int64_by_name(statement, name, timestamp);
+                return ruby_value_to_cass_timestamp_by_name(statement, name, rb_value);
             }
-            // Check if it's a Date object (only if Date class is defined)
-            VALUE rb_cDate = Qnil;
+            // Check if it's a Date object
             if (rb_const_defined(rb_cObject, rb_intern("Date"))) {
-                rb_cDate = rb_const_get(rb_cObject, rb_intern("Date"));
+                VALUE rb_cDate = rb_const_get(rb_cObject, rb_intern("Date"));
                 if (rb_obj_is_kind_of(rb_value, rb_cDate)) {
-                    // Convert Date to string representation
-                    VALUE str_val = rb_funcall(rb_value, rb_intern("to_s"), 0);
-                    const char* str = RSTRING_PTR(str_val);
-                    size_t len = RSTRING_LEN(str_val);
-                    return cass_statement_bind_string_by_name_n(statement, name, strlen(name), str, len);
+                    return ruby_value_to_cass_date_by_name(statement, name, rb_value);
                 }
             }
-            // Check if it's a TimeUuid object - for now, check by class name
-            VALUE rb_class = rb_obj_class(rb_value);
-            VALUE class_name = rb_funcall(rb_class, rb_intern("name"), 0);
-            if (rb_str_equal(class_name, rb_str_new_cstr("CassandraC::Types::TimeUuid"))) {
-                // Convert TimeUuid to string and bind as timeuuid
-                VALUE str_val = rb_funcall(rb_value, rb_intern("to_s"), 0);
-                return ruby_value_to_cass_timeuuid_by_name(statement, name, str_val);
+            // Check if it's a CassandraC::Native::TimeUuid object
+            if (rb_obj_is_kind_of(rb_value, cCassTimeUuid)) {
+                return ruby_value_to_cass_timeuuid_by_name(statement, name, rb_value);
+            }
+            // Check if it's a CassandraC::Types::Time object
+            VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
+            VALUE time_type_class = rb_const_get(mTypes, rb_intern("Time"));
+            if (rb_obj_is_kind_of(rb_value, time_type_class)) {
+                return ruby_value_to_cass_time_by_name(statement, name, rb_value);
             }
             // Fall through to default case for other objects
         }
@@ -315,14 +341,9 @@ VALUE cass_value_to_ruby(const CassValue* value) {
         case CASS_VALUE_TYPE_TIMEUUID: {
             CassUuid timeuuid;
             cass_value_get_uuid(value, &timeuuid);
-            char timeuuid_str[CASS_UUID_STRING_LENGTH];
-            cass_uuid_string(timeuuid, timeuuid_str);
             
-            // Return as TimeUuid wrapper object
-            VALUE rb_str = rb_str_new_cstr(timeuuid_str);
-            VALUE types_module = rb_const_get(mCassandraC, rb_intern("Types"));
-            VALUE timeuuid_class = rb_const_get(types_module, rb_intern("TimeUuid"));
-            rb_value = rb_funcall(timeuuid_class, rb_intern("new"), 1, rb_str);
+            // Return as CassandraC::Native::TimeUuid object
+            rb_value = rb_timeuuid_from_cass_uuid(timeuuid);
             break;
         }
         case CASS_VALUE_TYPE_BLOB: {
@@ -403,6 +424,36 @@ VALUE cass_value_to_ruby(const CassValue* value) {
             
             // Return Ruby hash
             rb_value = rb_hash;
+            break;
+        }
+        case CASS_VALUE_TYPE_DATE: {
+            cass_uint32_t date_days;
+            cass_value_get_uint32(value, &date_days);
+            
+            // Convert Cassandra date (days since Unix epoch) to Ruby Date
+            VALUE date_class = rb_const_get(rb_cObject, rb_intern("Date"));
+            VALUE epoch_date = rb_funcall(date_class, rb_intern("new"), 3, INT2NUM(1970), INT2NUM(1), INT2NUM(1));
+            rb_value = rb_funcall(epoch_date, rb_intern("+"), 1, UINT2NUM(date_days));
+            break;
+        }
+        case CASS_VALUE_TYPE_TIME: {
+            cass_int64_t time_ns;
+            cass_value_get_int64(value, &time_ns);
+            
+            // Return as CassandraC::Types::Time object (nanoseconds since midnight)
+            VALUE mTypes = rb_const_get(mCassandraC, rb_intern("Types"));
+            VALUE time_class = rb_const_get(mTypes, rb_intern("Time"));
+            rb_value = rb_funcall(time_class, rb_intern("from_nanoseconds_since_midnight"), 1, LL2NUM(time_ns));
+            break;
+        }
+        case CASS_VALUE_TYPE_TIMESTAMP: {
+            cass_int64_t timestamp_ms;
+            cass_value_get_int64(value, &timestamp_ms);
+            
+            // Convert milliseconds since Unix epoch to Ruby Time
+            double timestamp_seconds = (double)timestamp_ms / 1000.0;
+            VALUE time_class = rb_const_get(rb_cObject, rb_intern("Time"));
+            rb_value = rb_funcall(time_class, rb_intern("at"), 1, rb_float_new(timestamp_seconds));
             break;
         }
         // Add other data types as needed
@@ -915,19 +966,24 @@ CassError ruby_value_to_cass_timeuuid(CassStatement* statement, size_t index, VA
         return cass_statement_bind_null(statement, index);
     }
 
-    // Handle regular Ruby strings as TimeUUIDs
-    if (TYPE(rb_value) != T_STRING) {
-        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    // Handle CassandraC::Native::TimeUuid objects
+    if (rb_obj_is_kind_of(rb_value, cCassTimeUuid)) {
+        CassUuid timeuuid = rb_timeuuid_get_cass_uuid(rb_value);
+        return cass_statement_bind_uuid(statement, index, timeuuid);
     }
 
-    const char* timeuuid_cstr = RSTRING_PTR(rb_value);
-    CassUuid timeuuid;
-    CassError error = cass_uuid_from_string(timeuuid_cstr, &timeuuid);
-    if (error != CASS_OK) {
-        return error;
+    // Handle string TimeUUIDs for backward compatibility
+    if (TYPE(rb_value) == T_STRING) {
+        const char* timeuuid_cstr = RSTRING_PTR(rb_value);
+        CassUuid timeuuid;
+        CassError error = cass_uuid_from_string(timeuuid_cstr, &timeuuid);
+        if (error != CASS_OK) {
+            return error;
+        }
+        return cass_statement_bind_uuid(statement, index, timeuuid);
     }
 
-    return cass_statement_bind_uuid(statement, index, timeuuid);
+    return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
 }
 
 CassError ruby_value_to_cass_timeuuid_by_name(CassStatement* statement, const char* name, VALUE rb_value) {
@@ -935,19 +991,24 @@ CassError ruby_value_to_cass_timeuuid_by_name(CassStatement* statement, const ch
         return cass_statement_bind_null_by_name(statement, name);
     }
 
-    // Handle regular Ruby strings as TimeUUIDs
-    if (TYPE(rb_value) != T_STRING) {
-        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    // Handle CassandraC::Native::TimeUuid objects
+    if (rb_obj_is_kind_of(rb_value, cCassTimeUuid)) {
+        CassUuid timeuuid = rb_timeuuid_get_cass_uuid(rb_value);
+        return cass_statement_bind_uuid_by_name(statement, name, timeuuid);
     }
 
-    const char* timeuuid_cstr = RSTRING_PTR(rb_value);
-    CassUuid timeuuid;
-    CassError error = cass_uuid_from_string(timeuuid_cstr, &timeuuid);
-    if (error != CASS_OK) {
-        return error;
+    // Handle string TimeUUIDs for backward compatibility
+    if (TYPE(rb_value) == T_STRING) {
+        const char* timeuuid_str = StringValueCStr(rb_value);
+        CassUuid timeuuid;
+        CassError error = cass_uuid_from_string(timeuuid_str, &timeuuid);
+        if (error != CASS_OK) {
+            return error;
+        }
+        return cass_statement_bind_uuid_by_name(statement, name, timeuuid);
     }
 
-    return cass_statement_bind_uuid_by_name(statement, name, timeuuid);
+    return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
 }
 
 // Helper function to convert Ruby array to CassCollection

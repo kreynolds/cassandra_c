@@ -105,4 +105,5 @@ void Init_cassandra_c(void) {
     Init_cassandra_c_prepared(mCassandraCNative);
     Init_cassandra_c_statement(mCassandraCNative);
     Init_cassandra_c_batch(mCassandraCNative);
+    Init_cassandra_c_timeuuid(mCassandraCNative);
 }

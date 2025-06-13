@@ -146,72 +146,26 @@ module CassandraC
         seconds_since_midnight * NANOSECONDS_PER_SECOND + time.nsec
       end
     end
+  end
+end
 
-    class TimeUuid
-      attr_reader :uuid_string
+# Extend Ruby built-in classes with conversion methods for Cassandra TIME type
+# Note: Cassandra TIME represents time-of-day only (nanoseconds since midnight)
+# This is different from Ruby's Time class which includes date information
+class Time
+  def to_cassandra_time
+    CassandraC::Types::Time.new(self)
+  end
+end
 
-      def initialize(uuid_string)
-        @uuid_string = validate_timeuuid(uuid_string.to_s.downcase)
-      end
+class Integer
+  def to_cassandra_time
+    CassandraC::Types::Time.new(self)
+  end
+end
 
-      def self.generate
-        # This will be implemented in C extension
-        raise NotImplementedError, "TimeUuid.generate not yet implemented"
-      end
-
-      def self.from_time(time)
-        # This will be implemented in C extension
-        raise NotImplementedError, "TimeUuid.from_time not yet implemented"
-      end
-
-      def to_s
-        @uuid_string
-      end
-
-      def timestamp
-        # This will be implemented in C extension
-        raise NotImplementedError, "TimeUuid#timestamp not yet implemented"
-      end
-
-      def to_time
-        timestamp
-      end
-
-      def cassandra_typed_timeuuid?
-        true
-      end
-
-      def ==(other)
-        case other
-        when TimeUuid
-          @uuid_string == other.uuid_string
-        when String
-          @uuid_string == other.downcase
-        else
-          false
-        end
-      end
-
-      def hash
-        @uuid_string.hash
-      end
-
-      private
-
-      def validate_timeuuid(uuid_str)
-        # Basic UUID format validation
-        unless uuid_str.match?(/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/)
-          raise ArgumentError, "Invalid UUID format: #{uuid_str}"
-        end
-
-        # Check if it's a version 1 UUID (TimeUUID)
-        version = uuid_str[14].to_i(16)
-        unless version == 1
-          raise ArgumentError, "UUID must be version 1 (TimeUUID), got version #{version}"
-        end
-
-        uuid_str
-      end
-    end
+class String
+  def to_cassandra_time
+    CassandraC::Types::Time.new(self)
   end
 end

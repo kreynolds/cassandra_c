@@ -12,14 +12,14 @@ class TestSimplifiedAutoInference < Minitest::Test
     # ID needs explicit hint since schema expects int32
     statement.bind_by_index(0, 2001, :int)
     # big_val can use automatic inference since it expects bigint
-    statement.bind_by_index(1, 42) # Should automatically infer as bigint
+    statement.bind_by_index(1, 6000000000) # >32bit integer should automatically use bigint
 
     session.execute(statement)
 
     result = session.query("SELECT big_val FROM cassandra_c_test.integer_types WHERE id = 2001")
     row = result.to_a.first
     assert_instance_of Integer, row[0]
-    assert_equal 42, row[0]
+    assert_equal 6000000000, row[0]
   end
 
   def test_automatic_float_inference
@@ -88,7 +88,7 @@ class TestSimplifiedAutoInference < Minitest::Test
     statement = CassandraC::Native::Statement.new("INSERT INTO cassandra_c_test.uuid_types (id, timeuuid_val) VALUES (?, ?)", 2)
 
     timeuuid_str = "01234567-89ab-1def-8000-123456789abc"
-    timeuuid_obj = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    timeuuid_obj = CassandraC::Native::TimeUuid.new(timeuuid_str)
 
     statement.bind_by_index(0, "auto_timeuuid_test")
     statement.bind_by_index(1, timeuuid_obj) # Should infer as timeuuid
@@ -97,7 +97,7 @@ class TestSimplifiedAutoInference < Minitest::Test
 
     result = session.query("SELECT timeuuid_val FROM cassandra_c_test.uuid_types WHERE id = 'auto_timeuuid_test'")
     row = result.to_a.first
-    assert_instance_of CassandraC::Types::TimeUuid, row[0]
+    assert_instance_of CassandraC::Native::TimeUuid, row[0]
     assert_equal timeuuid_str, row[0].to_s
   end
 
@@ -106,12 +106,12 @@ class TestSimplifiedAutoInference < Minitest::Test
     statement = CassandraC::Native::Statement.new("INSERT INTO cassandra_c_test.integer_types (id, big_val) VALUES (:id, :big_val)", 2)
 
     statement.bind_by_name("id", 2005, :int) # Explicit hint for ID
-    statement.bind_by_name("big_val", 999) # Should infer as bigint
+    statement.bind_by_name("big_val", 7000000000) # >32bit integer should automatically use bigint
 
     session.execute(statement)
 
     result = session.query("SELECT big_val FROM cassandra_c_test.integer_types WHERE id = 2005")
     row = result.to_a.first
-    assert_equal 999, row[0]
+    assert_equal 7000000000, row[0]
   end
 end

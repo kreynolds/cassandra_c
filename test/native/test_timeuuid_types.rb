@@ -12,7 +12,7 @@ class TestTimeuuidTypes < Minitest::Test
     session.execute(statement)
 
     result = session.query("SELECT timeuuid_val FROM cassandra_c_test.uuid_types WHERE id = 'timeuuid_test_1'")
-    assert_instance_of CassandraC::Types::TimeUuid, result.to_a.first[0]
+    assert_instance_of CassandraC::Native::TimeUuid, result.to_a.first[0]
     assert_equal timeuuid_str, result.to_a.first[0].to_s
   end
 
@@ -25,13 +25,13 @@ class TestTimeuuidTypes < Minitest::Test
     session.execute(statement)
 
     result = session.query("SELECT timeuuid_val FROM cassandra_c_test.uuid_types WHERE id = 'timeuuid_test_2'")
-    assert_instance_of CassandraC::Types::TimeUuid, result.to_a.first[0]
+    assert_instance_of CassandraC::Native::TimeUuid, result.to_a.first[0]
     assert_equal timeuuid_str, result.to_a.first[0].to_s
   end
 
   def test_timeuuid_creation_from_string
     timeuuid_str = "01234567-89ab-1def-8000-123456789abc"
-    new_timeuuid = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    new_timeuuid = CassandraC::Native::TimeUuid.new(timeuuid_str)
 
     assert_equal timeuuid_str, new_timeuuid.to_s
     assert new_timeuuid.cassandra_typed_timeuuid?
@@ -39,7 +39,7 @@ class TestTimeuuidTypes < Minitest::Test
 
   def test_timeuuid_format_validation
     timeuuid_str = "01234567-89ab-1def-8000-123456789abc"
-    timeuuid = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    timeuuid = CassandraC::Native::TimeUuid.new(timeuuid_str)
 
     # TimeUUID must be version 1 (indicated by '1' in the 13th position)
     assert_match(/\A[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/, timeuuid.to_s)
@@ -50,14 +50,14 @@ class TestTimeuuidTypes < Minitest::Test
     # Try to create TimeUUID with version 4 UUID (SecureRandom.uuid generates v4)
     uuid_v4 = SecureRandom.uuid
     assert_raises(ArgumentError) do
-      CassandraC::Types::TimeUuid.new(uuid_v4)
+      CassandraC::Native::TimeUuid.new(uuid_v4)
     end
   end
 
   def test_timeuuid_equality
     timeuuid_str = "01234567-89ab-1def-8000-123456789abc"
-    timeuuid1 = CassandraC::Types::TimeUuid.new(timeuuid_str)
-    timeuuid2 = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    timeuuid1 = CassandraC::Native::TimeUuid.new(timeuuid_str)
+    timeuuid2 = CassandraC::Native::TimeUuid.new(timeuuid_str)
 
     assert_equal timeuuid1, timeuuid2
     assert_equal timeuuid1, timeuuid_str
@@ -74,7 +74,7 @@ class TestTimeuuidTypes < Minitest::Test
     result = session.query("SELECT timeuuid_val FROM cassandra_c_test.uuid_types WHERE id = 'timeuuid_round_trip_test'")
     retrieved_timeuuid = result.to_a.first[0]
 
-    assert_instance_of CassandraC::Types::TimeUuid, retrieved_timeuuid
+    assert_instance_of CassandraC::Native::TimeUuid, retrieved_timeuuid
     assert_equal timeuuid_str, retrieved_timeuuid.to_s
   end
 
@@ -101,14 +101,14 @@ class TestTimeuuidTypes < Minitest::Test
     result = session.query("SELECT created_at FROM cassandra_c_test.uuid_types WHERE id = 'timeuuid_timestamp_test'")
     timeuuid_from_db = result.to_a.first[0]
 
-    assert_instance_of CassandraC::Types::TimeUuid, timeuuid_from_db
+    assert_instance_of CassandraC::Native::TimeUuid, timeuuid_from_db
     assert_equal timeuuid_str, timeuuid_from_db.to_s
   end
 
   def test_timeuuid_generation_future
     # TimeUuid.generate will be implemented in C extension later
     timeuuid_str = "01234567-89ab-1def-8000-123456789abc"
-    timeuuid = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    timeuuid = CassandraC::Native::TimeUuid.new(timeuuid_str)
 
     assert_match(/\A[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/, timeuuid.to_s)
     assert timeuuid.cassandra_typed_timeuuid?
@@ -117,7 +117,7 @@ class TestTimeuuidTypes < Minitest::Test
   def test_timeuuid_from_time_future
     # TimeUuid.from_time will be implemented in C extension later
     timeuuid_str = "01234567-89ab-1def-8000-123456789abc"
-    timeuuid = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    timeuuid = CassandraC::Native::TimeUuid.new(timeuuid_str)
 
     assert_match(/\A[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/, timeuuid.to_s)
     assert timeuuid.cassandra_typed_timeuuid?

@@ -59,14 +59,26 @@ class TestBigintTypes < Minitest::Test
   end
 
   def test_bigint_automatic_inference
-    # Test that integers default to bigint with automatic inference
+    # Test that large integers automatically use bigint
     statement = CassandraC::Native::Statement.new("INSERT INTO cassandra_c_test.integer_types (id, big_val) VALUES (?, ?)", 2)
 
     statement.bind_by_index(0, 35, :int)    # Explicit hint for ID
-    statement.bind_by_index(1, 42)          # Should automatically infer as bigint
+    statement.bind_by_index(1, 5000000000)  # >32bit integer should automatically use bigint
     session.execute(statement)
 
     result = session.query("SELECT big_val FROM cassandra_c_test.integer_types WHERE id = 35")
+    assert_equal 5000000000, result.to_a.first[0]
+  end
+
+  def test_bigint_explicit_type_hint
+    # Test that small integers work with explicit bigint type hint
+    statement = CassandraC::Native::Statement.new("INSERT INTO cassandra_c_test.integer_types (id, big_val) VALUES (?, ?)", 2)
+
+    statement.bind_by_index(0, 36, :int)     # Explicit hint for ID
+    statement.bind_by_index(1, 42, :bigint) # Small integer with explicit bigint hint
+    session.execute(statement)
+
+    result = session.query("SELECT big_val FROM cassandra_c_test.integer_types WHERE id = 36")
     assert_equal 42, result.to_a.first[0]
   end
 end

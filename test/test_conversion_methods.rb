@@ -15,23 +15,23 @@ class TestConversionMethods < Minitest::Test
 
   def test_timeuuid_functionality
     timeuuid_str = "58e0a7d7-eebc-11d8-9669-0800200c9a66"
-    timeuuid = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    timeuuid = CassandraC::Native::TimeUuid.new(timeuuid_str)
 
-    assert_instance_of CassandraC::Types::TimeUuid, timeuuid
+    assert_instance_of CassandraC::Native::TimeUuid, timeuuid
     assert timeuuid.cassandra_typed_timeuuid?
     assert_equal timeuuid_str, timeuuid.to_s
   end
 
   def test_timeuuid_comparison_and_error_handling
     timeuuid_str = "58e0a7d7-eebc-11d8-9669-0800200c9a66"
-    timeuuid1 = CassandraC::Types::TimeUuid.new(timeuuid_str)
-    timeuuid2 = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    timeuuid1 = CassandraC::Native::TimeUuid.new(timeuuid_str)
+    timeuuid2 = CassandraC::Native::TimeUuid.new(timeuuid_str)
 
     assert_equal timeuuid1, timeuuid2
     assert_equal timeuuid1.hash, timeuuid2.hash
     assert_equal timeuuid1, timeuuid_str
 
-    assert_raises(ArgumentError) { CassandraC::Types::TimeUuid.new("invalid") }
-    assert_raises(ArgumentError) { CassandraC::Types::TimeUuid.new("550e8400-e29b-41d4-a716-446655440000") }
+    assert_raises(ArgumentError) { CassandraC::Native::TimeUuid.new("invalid") }
+    assert_raises(ArgumentError) { CassandraC::Native::TimeUuid.new("550e8400-e29b-41d4-a716-446655440000") }
   end
 end

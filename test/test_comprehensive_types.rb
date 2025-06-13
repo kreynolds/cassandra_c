@@ -80,14 +80,14 @@ class TestComprehensiveTypes < Minitest::Test
 
   def test_timeuuid_comprehensive
     timeuuid_str = "58e0a7d7-eebc-11d8-9669-0800200c9a66"
-    timeuuid = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    timeuuid = CassandraC::Native::TimeUuid.new(timeuuid_str)
     assert_equal timeuuid_str, timeuuid.to_s
     assert timeuuid.cassandra_typed_timeuuid?
-    assert timeuuid == CassandraC::Types::TimeUuid.new(timeuuid_str)
+    assert timeuuid == CassandraC::Native::TimeUuid.new(timeuuid_str)
     assert_equal "1", timeuuid.to_s[14] # Version 1
 
-    assert_raises(ArgumentError) { CassandraC::Types::TimeUuid.new("invalid") }
-    assert_raises(ArgumentError) { CassandraC::Types::TimeUuid.new("550e8400-e29b-41d4-a716-446655440000") }
+    assert_raises(ArgumentError) { CassandraC::Native::TimeUuid.new("invalid") }
+    assert_raises(ArgumentError) { CassandraC::Native::TimeUuid.new("550e8400-e29b-41d4-a716-446655440000") }
   end
 
   def test_native_types_with_hints
@@ -97,8 +97,8 @@ class TestComprehensiveTypes < Minitest::Test
     assert_instance_of String, "550e8400-e29b-41d4-a716-446655440000"
 
     timeuuid_str = "58e0a7d7-eebc-11d8-9669-0800200c9a66"
-    timeuuid = CassandraC::Types::TimeUuid.new(timeuuid_str)
-    assert_instance_of CassandraC::Types::TimeUuid, timeuuid
+    timeuuid = CassandraC::Native::TimeUuid.new(timeuuid_str)
+    assert_instance_of CassandraC::Native::TimeUuid, timeuuid
     assert_equal timeuuid_str, timeuuid.to_s
   end
 
@@ -117,7 +117,7 @@ class TestComprehensiveTypes < Minitest::Test
 
     assert_equal 123, BigDecimal("123").to_i
 
-    assert_raises(ArgumentError) { CassandraC::Types::TimeUuid.new("58e0a7d7-eebc-21d8-9669-0800200c9a66") }
-    assert_raises(ArgumentError) { CassandraC::Types::TimeUuid.new("58e0a7d7-eebc-41d8-9669-0800200c9a66") }
+    assert_raises(ArgumentError) { CassandraC::Native::TimeUuid.new("58e0a7d7-eebc-21d8-9669-0800200c9a66") }
+    assert_raises(ArgumentError) { CassandraC::Native::TimeUuid.new("58e0a7d7-eebc-41d8-9669-0800200c9a66") }
   end
 end

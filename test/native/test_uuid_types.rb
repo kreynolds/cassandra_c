@@ -45,7 +45,7 @@ class TestUuidTypes < Minitest::Test
     # Use a valid TimeUUID string (version 1)
     timeuuid_str = "01234567-89ab-1def-8000-123456789abc"
 
-    new_timeuuid = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    new_timeuuid = CassandraC::Native::TimeUuid.new(timeuuid_str)
     assert_equal timeuuid_str, new_timeuuid.to_s
     assert new_timeuuid.cassandra_typed_timeuuid?
   end
@@ -53,7 +53,7 @@ class TestUuidTypes < Minitest::Test
   def test_timeuuid_string_conversion_method
     # Create a valid TimeUUID string manually for testing
     timeuuid_str = "01234567-89ab-1def-8000-123456789abc"
-    timeuuid = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    timeuuid = CassandraC::Native::TimeUuid.new(timeuuid_str)
 
     assert_equal timeuuid_str, timeuuid.to_s
     assert timeuuid.cassandra_typed_timeuuid?
@@ -63,7 +63,7 @@ class TestUuidTypes < Minitest::Test
     # TimeUuid.generate will be implemented in C extension later
     # For now, test with manual TimeUUID string
     timeuuid_str = "01234567-89ab-1def-8000-123456789abc"
-    timeuuid = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    timeuuid = CassandraC::Native::TimeUuid.new(timeuuid_str)
     assert_match(/\A[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/, timeuuid.to_s)
     assert timeuuid.cassandra_typed_timeuuid?
   end
@@ -72,7 +72,7 @@ class TestUuidTypes < Minitest::Test
     # TimeUuid.from_time will be implemented in C extension later
     # For now, test that we can create TimeUuid from string
     timeuuid_str = "01234567-89ab-1def-8000-123456789abc"
-    timeuuid = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    timeuuid = CassandraC::Native::TimeUuid.new(timeuuid_str)
 
     assert_match(/\A[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/, timeuuid.to_s)
     assert timeuuid.cassandra_typed_timeuuid?
@@ -84,7 +84,7 @@ class TestUuidTypes < Minitest::Test
     # TimeUuid.from_time will be implemented in C extension
     # For now, test with manual TimeUUID string
     timeuuid_str = "01234567-89ab-1def-8000-123456789abc"
-    timeuuid = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    timeuuid = CassandraC::Native::TimeUuid.new(timeuuid_str)
 
     assert timeuuid.cassandra_typed_timeuuid?
     # timestamp and from_time methods will be implemented in C extension
@@ -94,14 +94,14 @@ class TestUuidTypes < Minitest::Test
     # Try to create TimeUUID with version 4 UUID (SecureRandom.uuid generates v4)
     uuid_v4 = SecureRandom.uuid
     assert_raises(ArgumentError) do
-      CassandraC::Types::TimeUuid.new(uuid_v4)
+      CassandraC::Native::TimeUuid.new(uuid_v4)
     end
   end
 
   def test_timeuuid_equality
     timeuuid_str = "01234567-89ab-1def-8000-123456789abc"
-    timeuuid1 = CassandraC::Types::TimeUuid.new(timeuuid_str)
-    timeuuid2 = CassandraC::Types::TimeUuid.new(timeuuid_str)
+    timeuuid1 = CassandraC::Native::TimeUuid.new(timeuuid_str)
+    timeuuid2 = CassandraC::Native::TimeUuid.new(timeuuid_str)
 
     assert_equal timeuuid1, timeuuid2
     assert_equal timeuuid1, timeuuid_str
@@ -162,7 +162,7 @@ class TestUuidTypes < Minitest::Test
     result = session.query("SELECT timeuuid_val FROM cassandra_c_test.uuid_types WHERE id = 'string_timeuuid_test'")
     row = result.to_a.first
     # Should return TimeUuid object
-    assert_instance_of CassandraC::Types::TimeUuid, row[0]
+    assert_instance_of CassandraC::Native::TimeUuid, row[0]
     assert_equal timeuuid_str, row[0].to_s
   end
 
@@ -177,7 +177,7 @@ class TestUuidTypes < Minitest::Test
     result = session.query("SELECT timeuuid_val FROM cassandra_c_test.uuid_types WHERE id = 'type_hint_timeuuid_test'")
     row = result.to_a.first
     # Should return TimeUuid object
-    assert_instance_of CassandraC::Types::TimeUuid, row[0]
+    assert_instance_of CassandraC::Native::TimeUuid, row[0]
     assert_equal timeuuid_str, row[0].to_s
   end
 
@@ -192,7 +192,7 @@ class TestUuidTypes < Minitest::Test
     result = session.query("SELECT timeuuid_val FROM cassandra_c_test.uuid_types WHERE id = 'name_timeuuid_test'")
     row = result.to_a.first
     # Should return TimeUuid object
-    assert_instance_of CassandraC::Types::TimeUuid, row[0]
+    assert_instance_of CassandraC::Native::TimeUuid, row[0]
     assert_equal timeuuid_str, row[0].to_s
   end
 
@@ -214,7 +214,7 @@ class TestUuidTypes < Minitest::Test
     # Check that results are properly typed
     assert_instance_of String, row[0]
     # Should return TimeUuid object for timeuuid columns
-    assert_instance_of CassandraC::Types::TimeUuid, row[1]
+    assert_instance_of CassandraC::Native::TimeUuid, row[1]
     assert_equal uuid_str.downcase, row[0].downcase
     assert_equal timeuuid_str, row[1].to_s
   end
@@ -234,7 +234,7 @@ class TestUuidTypes < Minitest::Test
     timeuuid_from_db = row[0]
 
     # Should return TimeUuid object
-    assert_instance_of CassandraC::Types::TimeUuid, timeuuid_from_db
+    assert_instance_of CassandraC::Native::TimeUuid, timeuuid_from_db
     assert_equal timeuuid_str, timeuuid_from_db.to_s
   end
 

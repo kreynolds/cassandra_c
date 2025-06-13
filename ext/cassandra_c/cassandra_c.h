@@ -20,6 +20,13 @@ extern VALUE mCassandraC;
 extern VALUE mCassandraCNative;
 extern VALUE rb_eCassandraError;
 
+// TimeUuid class
+extern VALUE cCassTimeUuid;
+void Init_cassandra_c_timeuuid(VALUE module);
+void cleanup_timeuuid();
+CassUuid rb_timeuuid_get_cass_uuid(VALUE timeuuid_obj);
+VALUE rb_timeuuid_from_cass_uuid(CassUuid uuid);
+
 // ============================================================================
 // Global Configuration
 // ============================================================================

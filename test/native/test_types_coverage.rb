@@ -15,12 +15,12 @@ class TestTypesCoverage < Minitest::Test
   # Test TimeUuid specific functionality
   def test_timeuuid_coverage
     # Test TimeUuid initialization
-    timeuuid = CassandraC::Types::TimeUuid.new("58e0a7d7-eebc-11d8-9669-0800200c9a66")
-    assert_instance_of CassandraC::Types::TimeUuid, timeuuid
+    timeuuid = CassandraC::Native::TimeUuid.new("58e0a7d7-eebc-11d8-9669-0800200c9a66")
+    assert_instance_of CassandraC::Native::TimeUuid, timeuuid
     assert timeuuid.cassandra_typed_timeuuid?
 
     # Test error handling
-    assert_raises(ArgumentError) { CassandraC::Types::TimeUuid.new("invalid") }
-    assert_raises(ArgumentError) { CassandraC::Types::TimeUuid.new(123) }
+    assert_raises(ArgumentError) { CassandraC::Native::TimeUuid.new("invalid") }
+    assert_raises(ArgumentError) { CassandraC::Native::TimeUuid.new(123) }
   end
 end
